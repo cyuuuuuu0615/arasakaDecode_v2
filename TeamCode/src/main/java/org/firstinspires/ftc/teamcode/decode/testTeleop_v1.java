@@ -203,11 +203,12 @@ public class testTeleop_v1 extends LinearOpMode {
 
         int detectionMethod = 0; // 0: Enhanced, 1: Simple, 2: Ratio
 
+
         boolean purple = false;
         boolean green = false;
-        double leftPushON = 0;
+        double leftPushON = 1;
         double leftPushOFF = 0;
-        double rightPushON = 0;
+        double rightPushON = 1;
         double rightPushOFF = 0;
         long startTime1 = 0;
         long currentTime1 = 0;
@@ -224,6 +225,14 @@ public class testTeleop_v1 extends LinearOpMode {
         long startTime7 = 0;
         long currentTime7 = 0;
         long startTime = System.currentTimeMillis();
+
+        intakeMotor.setPower(0);
+        leftPushServo.setPosition(leftPushOFF);
+        rightPushServo.setPosition(rightPushOFF);
+        xuanzhuan.setPower(0);
+        purple = false;
+        green = false;
+
 
 
         waitForStart();
@@ -264,42 +273,59 @@ public class testTeleop_v1 extends LinearOpMode {
 
             if(purple){
                 currentTime3 = System.currentTimeMillis() - startTime3;
-                if(currentTime3>5000){
-                    purple = false;
-                }
+//                if(currentTime3>5000){
+//                    purple = false;
+//                }
             }
 
             if(green){
                 currentTime4 = System.currentTimeMillis() - startTime4;
-                if(currentTime4>5000){
+//                if(currentTime4>5000){
+//                    green = false;
+//                }
+            }
+            if(!gamepad1.x && !gamepad1.y){
+                if(gamepad1.left_bumper){
+                    if(purple){
+                        leftPushServo.setPosition(leftPushON);
+                    }else if(green){
+                        rightPushServo.setPosition(rightPushON);
+                    }
+                    purple = false;
                     green = false;
+
+                }
+
+                if(!purple && !green){
+                    leftPushServo.setPosition(leftPushOFF);
+                    rightPushServo.setPosition(rightPushOFF);
                 }
             }
 
-            if(gamepad1.left_bumper){
-                if(purple){
-                    leftPushServo.setPosition(leftPushON);
-                }else if(green){
-                    rightPushServo.setPosition(rightPushON);
-                }
-
+            if(gamepad1.x){
+                leftPushServo.setPosition(leftPushON);
+            }if(gamepad1.y){
+                rightPushServo.setPosition(rightPushON);
             }
 
-            xuanzhuan.setPower(gamepad1.right_trigger);
 
 
 
 
-            if(gamepad1.right_bumper){
+
+            if(gamepad1.a){
                 intakeMotor.setPower(1);
-            }else{
+                xuanzhuan.setPower(0.8);
+            }else if(gamepad1.b){
                 intakeMotor.setPower(0);
+                xuanzhuan.setPower(0);
             }
 //
 //
 //
 
-
+            telemetry.addData("purple",purple);
+            telemetry.addData("green",green);
             telemetry.addData("xuanzhuan",xuanzhuan.getPower());
             telemetry.addData("leftPushServo",leftPushServo.getPosition());
             telemetry.addData("rightPushServo",rightPushServo.getPosition());
