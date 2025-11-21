@@ -55,16 +55,12 @@ public class teleop extends LinearOpMode {
         DcMotor backLeftMotor = hardwareMap.get(DcMotor.class, "motor2");
         DcMotor frontRightMotor = hardwareMap.get(DcMotor.class, "motor0");
         DcMotor backRightMotor = hardwareMap.get(DcMotor.class, "motor3");
-        DcMotor intakeMotor = hardwareMap.get(DcMotor.class, "motor4");
-        DcMotor fasheMotor = hardwareMap.get(DcMotor.class, "motor5");
-        CRServo fasheServo = hardwareMap.get(CRServo.class, "servo0");
-//        DcMotor dipanmotor = hardwareMap.get(DcMotor.class, "motor4");
-//        dipanmotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-//        dipanmotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        DcMotor intakeMotor4 = hardwareMap.get(DcMotor.class, "motor4");
+        DcMotor intakeMotor5 = hardwareMap.get(DcMotor.class, "motor5");
+
+
         frontLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         backLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
-        fasheMotor.setDirection(DcMotorSimple.Direction.REVERSE);
-//        dipanmotor.setDirection(DcMotorSimple.Direction.REVERSE);
         frontRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -112,31 +108,38 @@ public class teleop extends LinearOpMode {
             }
 
 
+            intakeMotor4.setPower(-1);
+            intakeMotor5.setPower(-1);
+            //            if(gamepad1.left_bumper){
+//
+//            } else {
+//                intakeMotor4.setPower(0);
+//            }
 
-            if(gamepad1.left_bumper){
-                intakeMotor.setPower(1);
-            } else {
-                intakeMotor.setPower(0);
-            }
-            fasheMotor.setPower(gamepad1.left_trigger-gamepad1.right_trigger);
+//            if(gamepad1.right_bumper){
+//                intakeMotor5.setPower(1);
+//            } else {
+//                intakeMotor5.setPower(0);
+//            }
+//            fasheMotor.setPower(gamepad1.left_trigger-gamepad1.right_trigger);
 //------------------------------------------------------------------------------------------
 
-            if(fasheOn){
-                currentTime3 = System.currentTimeMillis() - startTime3;
-                fasheServo.setPower(-1);
-                if(currentTime3>5000){
-                    fasheOn = false;
-                }
-            }
+//            if(fasheOn){
+//                currentTime3 = System.currentTimeMillis() - startTime3;
+//                fasheServo.setPower(-1);
+//                if(currentTime3>5000){
+//                    fasheOn = false;
+//                }
+//            }
 
-            if(gamepad1.a){
-                fasheOn = true;
-                startTime3 = System.currentTimeMillis();
-            }
-
-            if(!fasheOn){
-                fasheServo.setPower(0);
-            }
+//            if(gamepad1.a){
+//                fasheOn = true;
+//                startTime3 = System.currentTimeMillis();
+//            }
+//
+//            if(!fasheOn){
+//                fasheServo.setPower(0);
+//            }
 
 //------------------------------------------------------------------------------------------
 
@@ -174,10 +177,9 @@ public class teleop extends LinearOpMode {
             frontRightMotor.setPower(frontRightPower);
             backRightMotor.setPower(backRightPower);
 
-//            telemetry.addData("dipanmotor",dipanmotor);
-            telemetry.addData("fasheMotor",fasheMotor);
-            telemetry.addData("intakeMotor",intakeMotor);
-
+//            telemetry.addData("dipanmotor",dipanmotor);   
+            telemetry.addData("intakeMotor4",intakeMotor4.getPower());
+            telemetry.addData("intakeMotor5",intakeMotor5.getPower());
             telemetry.update();
         }
 

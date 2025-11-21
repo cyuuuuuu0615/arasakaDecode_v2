@@ -30,7 +30,7 @@ public class TestBenchColor {
     }
 
     public void init(HardwareMap hwMap){
-        colorSensor = hwMap.get(NormalizedColorSensor.class,"colorSensor");
+        colorSensor = hwMap.get(NormalizedColorSensor.class,"colorSensor1");
     }
 
     public DetectedColor getDectedColor(Telemetry telemetry){
