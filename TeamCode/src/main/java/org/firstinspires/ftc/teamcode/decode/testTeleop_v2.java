@@ -374,7 +374,7 @@ public class testTeleop_v2 extends LinearOpMode {
                     sequenceInProgress = false;
                 }).start();
                 sleep(200); // 防止重复触发
-            }
+            }//f
 
             // 4. 显示状态信息
             telemetry.addLine("=== ROBOT STATUS ===");
