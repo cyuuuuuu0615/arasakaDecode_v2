@@ -23,7 +23,7 @@ public class ColorSensorTest_AI_v4 extends LinearOpMode {
     // 根據 Blocks 程式修正位置值
     private static final double SERVO_ACTIVE_POSITION = 0.7;   // 發射位置
     private static final double SERVO_REST_POSITION = 0.0;     // 休息位置 (Blocks中使用0)
-    private static final int FIRING_INTERVAL_MS = 500;
+    private static final int FIRING_INTERVAL_MS = 2000;
 
     private static final float MIN_COLOR_THRESHOLD = 0.005f;
 
@@ -58,7 +58,7 @@ public class ColorSensorTest_AI_v4 extends LinearOpMode {
         // 設定範圍縮放 (對應 Blocks 的 scaleRange)
         servo1.scaleRange(0, 0.5);
         servo2.scaleRange(0, 0.5);
-        // servo3 不需要 scaleRange，因為 Blocks 中只有 s0 和 s1 有設定
+        servo3.scaleRange(0, 0.5);
 
         resetAllServos();
     }

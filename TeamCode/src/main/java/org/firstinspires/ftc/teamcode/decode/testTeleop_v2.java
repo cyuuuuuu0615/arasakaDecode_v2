@@ -34,7 +34,7 @@ public class testTeleop_v2 extends LinearOpMode {
     // 常數設定
     private static final double SERVO_ACTIVE_POSITION = 0.7;
     private static final double SERVO_REST_POSITION = 0.0;
-    private static final int FIRING_INTERVAL_MS = 500;
+    private static final int FIRING_INTERVAL_MS = 2000;
 
     private static final float MIN_COLOR_THRESHOLD = 0.005f;
 
@@ -50,39 +50,40 @@ public class testTeleop_v2 extends LinearOpMode {
     private boolean sequenceInProgress = false;
 
     public void init(HardwareMap hwMap) {
-        // 初始化顏色感測器
         colorSensor0 = hwMap.get(NormalizedColorSensor.class, "colorSensor0");
         colorSensor1 = hwMap.get(NormalizedColorSensor.class, "colorSensor1");
         colorSensor2 = hwMap.get(NormalizedColorSensor.class, "colorSensor2");
         colorSensor3 = hwMap.get(NormalizedColorSensor.class, "colorSensor3");
 
-        // 初始化 Servo
         servo1 = hwMap.get(Servo.class, "servo1");
         servo2 = hwMap.get(Servo.class, "servo2");
         servo3 = hwMap.get(Servo.class, "servo3");
 
-        // Servo 方向設定
         servo1.setDirection(Servo.Direction.REVERSE);
         servo2.setDirection(Servo.Direction.FORWARD);
         servo3.setDirection(Servo.Direction.REVERSE);
 
-        // Servo 範圍縮放
         servo1.scaleRange(0, 0.5);
         servo2.scaleRange(0, 0.5);
+        servo3.scaleRange(0, 0.5);
 
-        // 初始化車子移動馬達
-        frontLeftMotor = hwMap.get(DcMotor.class, "frontLeftMotor");
-        frontRightMotor = hwMap.get(DcMotor.class, "frontRightMotor");
-        backLeftMotor = hwMap.get(DcMotor.class, "backLeftMotor");
-        backRightMotor = hwMap.get(DcMotor.class, "backRightMotor");
-        intakeMotor4 = hwMap.get(DcMotor.class, "intakeMotor4");
-        intakeMotor5 = hwMap.get(DcMotor.class, "intakeMotor5");
 
-        // 設定馬達方向（根據實際硬件調整）
-        frontLeftMotor.setDirection(DcMotor.Direction.FORWARD);
-        frontRightMotor.setDirection(DcMotor.Direction.REVERSE);
-        backLeftMotor.setDirection(DcMotor.Direction.FORWARD);
-        backRightMotor.setDirection(DcMotor.Direction.REVERSE);
+        frontLeftMotor = hwMap.get(DcMotor.class, "motor1");
+        frontRightMotor = hwMap.get(DcMotor.class, "motor0");
+        backLeftMotor = hwMap.get(DcMotor.class, "motor2");
+        backRightMotor = hwMap.get(DcMotor.class, "motor3");
+        intakeMotor4 = hwMap.get(DcMotor.class, "motor4");
+        intakeMotor5 = hwMap.get(DcMotor.class, "motor5");
+
+
+        frontLeftMotor.setDirection(DcMotor.Direction.REVERSE);
+        backLeftMotor.setDirection(DcMotor.Direction.REVERSE);
+
+
+        frontRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        backRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        backLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        frontLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         resetAllServos();
     }
@@ -126,13 +127,13 @@ public class testTeleop_v2 extends LinearOpMode {
         telemetry.addData("Servo Action", "Completed for Position " + position);
     }
 
-    // 車子移動控制
+
     private void driveRobot() {
         double x = gamepad1.left_stick_x;
         double y = -gamepad1.left_stick_y; // Y stick value is reversed
         double rx = gamepad1.right_stick_x;
 
-        // Mecanum 輪移動計算
+
         double theta = Math.atan2(y, x);
         double power = Math.hypot(x, y);
 
@@ -145,7 +146,7 @@ public class testTeleop_v2 extends LinearOpMode {
         double backLeftPower = power * sin/max + rx;
         double backRightPower = power * cos/max - rx;
 
-        // 功率歸一化
+
         if ((power + Math.abs(rx)) > 1) {
             frontLeftPower /= power + Math.abs(rx);
             frontRightPower /= power + Math.abs(rx);
@@ -153,11 +154,18 @@ public class testTeleop_v2 extends LinearOpMode {
             backRightPower /= power + Math.abs(rx);
         }
 
-        // 設定 intake 馬達功率
-        intakeMotor4.setPower(-1);
-        intakeMotor5.setPower(-1);
+        if(gamepad1.dpad_up){
+            intakeMotor4.setPower(1);
+            intakeMotor5.setPower(1);
+        }
+        if(gamepad1.dpad_down){
+            intakeMotor4.setPower(0);
+            intakeMotor5.setPower(0);
+        }
 
-        // 設定驅動馬達功率
+
+
+
         frontLeftMotor.setPower(frontLeftPower);
         backLeftMotor.setPower(backLeftPower);
         frontRightMotor.setPower(frontRightPower);
@@ -339,51 +347,42 @@ public class testTeleop_v2 extends LinearOpMode {
         waitForStart();
 
         while (opModeIsActive()) {
-            // 1. 處理車子移動（每循環都執行）
+            // 1. 处理车子移动（每循环都执行，即使在序列进行中）
             driveRobot();
 
-            // 2. 處理模式選擇
+            // 2. 处理模式选择（无论序列是否进行中都可以操作）
             if (gamepad1.a) {
                 currentColorMode = ColorMode.GREEN_PURPLE_PURPLE;
-                sequenceInProgress = false;
                 telemetry.addData("Mode Changed", "GREEN_PURPLE_PURPLE");
                 sleep(200);
             } else if (gamepad1.b) {
                 currentColorMode = ColorMode.PURPLE_GREEN_PURPLE;
-                sequenceInProgress = false;
                 telemetry.addData("Mode Changed", "PURPLE_GREEN_PURPLE");
                 sleep(200);
             } else if (gamepad1.x) {
                 currentColorMode = ColorMode.PURPLE_PURPLE_GREEN;
-                sequenceInProgress = false;
                 telemetry.addData("Mode Changed", "PURPLE_PURPLE_GREEN");
                 sleep(200);
             }
 
-            // 3. 處理自動發射序列
+            // 3. 处理自动发射序列（使用非阻塞方式）
             if (gamepad1.left_bumper && !sequenceInProgress) {
                 sequenceInProgress = true;
-                executeFullFiringSequence(telemetry);
-                sequenceInProgress = false;
-                sleep(500);
+                // 不等待序列完成，立即继续循环
+                new Thread(() -> {
+                    executeFullFiringSequence(telemetry);
+                    sequenceInProgress = false;
+                }).start();
+                sleep(200); // 防止重复触发
             }
 
-            // 4. 顯示狀態資訊
+            // 4. 显示状态信息
             telemetry.addLine("=== ROBOT STATUS ===");
             telemetry.addData("Current Mode", currentColorMode);
-            telemetry.addData("Sequence Ready", !sequenceInProgress ? "YES" : "IN PROGRESS");
+            telemetry.addData("Sequence Status", sequenceInProgress ? "IN PROGRESS" : "READY");
             telemetry.addData("Drive System", "Mecanum - Active");
-            telemetry.addData("Intake System", "Running at power -1");
+            telemetry.addData("Intake System", "D-pad Up/Down to control");
             telemetry.update();
         }
-
-        // 停止所有馬達
-        frontLeftMotor.setPower(0);
-        frontRightMotor.setPower(0);
-        backLeftMotor.setPower(0);
-        backRightMotor.setPower(0);
-        intakeMotor4.setPower(0);
-        intakeMotor5.setPower(0);
-        resetAllServos();
     }
 }
