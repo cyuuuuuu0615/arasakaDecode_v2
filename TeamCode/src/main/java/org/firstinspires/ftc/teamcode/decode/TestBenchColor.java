@@ -13,12 +13,12 @@ public class TestBenchColor {
 
     NormalizedColorSensor colorSensor;
 
-    long PR = 0;
-    long PG = 0;
-    long PB = 0;
-    long GR = 0;
-    long GG = 0;
-    long GB = 0;
+    double PR = 0.0074;
+    double PG = 0.0124;
+    double PB = 0.0178;
+    double GR = 0.0055;
+    double GG = 0.0146;
+    double GB = 0.0143;
 
 
     public enum DetectedColor {
@@ -45,15 +45,15 @@ public class TestBenchColor {
         telemetry.addData("green", normGreen);
         telemetry.addData("bule", normBlue);
 
-//        if(normRed > PR && normGreen > PG && normBlue > PB){
-//            return DetectedColor.PURPLE;
-//        }else if(normRed > GR && normGreen > GG && normBlue > GB){
-//            return DetectedColor.GREEN;
-//        }else {
-//            return DetectedColor.UNKOWN;
-//
-//        }
-        return DetectedColor.UNKOWN;
+        if(normRed > PR && normGreen > PG && normBlue > PB){
+            return DetectedColor.PURPLE;
+        }else if(normRed > GR && normGreen > GG && normBlue > GB){
+            return DetectedColor.GREEN;
+        }else {
+            return DetectedColor.UNKOWN;
+
+        }
+//        return DetectedColor.UNKOWN;
 
 
     }

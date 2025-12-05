@@ -2,630 +2,414 @@
 //
 //import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 //import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+//import com.qualcomm.robotcore.hardware.DcMotor;
 //import com.qualcomm.robotcore.hardware.HardwareMap;
 //import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 //import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 //import com.qualcomm.robotcore.hardware.Servo;
 //import org.firstinspires.ftc.robotcore.external.Telemetry;
 //
-//import com.acmerobotics.roadrunner.Action;
-//import com.acmerobotics.roadrunner.ftc.Actions;
-//import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-//import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-//import com.qualcomm.robotcore.hardware.CRServo;
-//import com.qualcomm.robotcore.hardware.ColorSensor;
-//import com.qualcomm.robotcore.hardware.DcMotor;
-//import com.qualcomm.robotcore.hardware.DcMotorSimple;
-//import com.qualcomm.robotcore.hardware.Servo;
+//@TeleOp(name = "testTeleop_v3")
+//public class testTeleop_v3 extends LinearOpMode {
 //
-//@TeleOp(name = "testTeleop_v1")
-//public class testTeleop_v1 extends LinearOpMode {
+//    NormalizedColorSensor colorSensor0; // servo1 - sensor 1
+//    NormalizedColorSensor colorSensor1; // servo1 - sensor 2
+//    NormalizedColorSensor colorSensor2; // servo2 - sensor 1
+//    NormalizedColorSensor colorSensor3; // servo2 - sensor 2
+//    NormalizedColorSensor colorSensor4; // servo3 - sensor 1
+//    NormalizedColorSensor colorSensor5; // servo3 - sensor 2
 //
-//    NormalizedColorSensor colorSensor;
+//    // Servo
+//    Servo servo1; // s0
+//    Servo servo2; // s1
+//    Servo servo3; // s2
 //
-//    // 根據您的新數據調整的極敏感閾值
-//    private static final float MIN_COLOR_THRESHOLD = 0.0005f; // 非常低的閾值
+//    DcMotor frontLeftMotor;
+//    DcMotor frontRightMotor;
+//    DcMotor backLeftMotor;
+//    DcMotor backRightMotor;
+//    DcMotor intakeMotor4;
+//    DcMotor intakeMotor5;
 //
-//    // Servo 位置
-//    private static final double SERVO_UP_POSITION = 0.8;
-//    private static final double SERVO_DOWN_POSITION = 0.2;
-//
-//    private boolean servoActivated = false;
-//    private int detectionCount = 0;
-//    private static final int REQUIRED_DETECTIONS = 3; // 需要連續檢測到多次才觸發
+//    private static final double SERVO_ACTIVE_POSITION = 0.7;
+//    private static final double SERVO_REST_POSITION = 0.0;
+//    private static final int FIRING_INTERVAL_MS = 2000;
 //
 //    public enum DetectedColor {
-//        PURPLE,
-//        GREEN,
-//        UNKNOWN
+//        PURPLE, GREEN, UNKNOWN
 //    }
+//
+//    public enum ColorMode {
+//        GREEN_PURPLE_PURPLE, PURPLE_GREEN_PURPLE, PURPLE_PURPLE_GREEN
+//    }
+//
+//    private ColorMode currentColorMode = ColorMode.GREEN_PURPLE_PURPLE;
+//    private boolean sequenceInProgress = false;
 //
 //    public void init(HardwareMap hwMap) {
-//        colorSensor = hwMap.get(NormalizedColorSensor.class, "colorSensor");
+//        colorSensor0 = hwMap.get(NormalizedColorSensor.class, "colorSensor0");
+//        colorSensor1 = hwMap.get(NormalizedColorSensor.class, "colorSensor1");
+//        colorSensor2 = hwMap.get(NormalizedColorSensor.class, "colorSensor2");
+//        colorSensor3 = hwMap.get(NormalizedColorSensor.class, "colorSensor3");
+//        colorSensor4 = hwMap.get(NormalizedColorSensor.class, "colorSensor4");
+//        colorSensor5 = hwMap.get(NormalizedColorSensor.class, "colorSensor5");
 //
+//        servo1 = hwMap.get(Servo.class, "servo1");
+//        servo2 = hwMap.get(Servo.class, "servo2");
+//        servo3 = hwMap.get(Servo.class, "servo3");
+//
+//        servo1.setDirection(Servo.Direction.REVERSE);
+//        servo2.setDirection(Servo.Direction.FORWARD);
+//        servo3.setDirection(Servo.Direction.REVERSE);
+//
+//        servo1.scaleRange(0, 0.5);
+//        servo2.scaleRange(0, 1);
+//        servo3.scaleRange(0, 0.5);
+//
+//        frontLeftMotor = hwMap.get(DcMotor.class, "motor1");
+//        frontRightMotor = hwMap.get(DcMotor.class, "motor0");
+//        backLeftMotor = hwMap.get(DcMotor.class, "motor2");
+//        backRightMotor = hwMap.get(DcMotor.class, "motor3");
+//        intakeMotor4 = hwMap.get(DcMotor.class, "motor4");
+////        intakeMotor5 = hwMap.get(DcMotor.class, "motor5");
+//
+//        frontLeftMotor.setDirection(DcMotor.Direction.REVERSE);
+//        backLeftMotor.setDirection(DcMotor.Direction.REVERSE);
+//
+//        frontRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+//        backRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+//        backLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+//        frontLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+//
+//        resetAllServos();
 //    }
 //
-//    public DetectedColor getDetectedColor(Telemetry telemetry) {
-//        NormalizedRGBA color = colorSensor.getNormalizedColors();
+//    private void resetAllServos() {
+//        servo1.setPosition(SERVO_REST_POSITION);
+//        servo2.setPosition(SERVO_REST_POSITION);
+//        servo3.setPosition(SERVO_REST_POSITION);
+//        sleep(300);
+//    }
 //
-//        float red = color.red;
-//        float green = color.green;
-//        float blue = color.blue;
+//    private void activateServo(int position) {
+//        telemetry.addData("Servo Action", "Activating Position " + position);
 //
-//        telemetry.addData("Red", "%.4f", red); // 顯示4位小數
-//        telemetry.addData("Green", "%.4f", green);
-//        telemetry.addData("Blue", "%.4f", blue);
-//
-//        // 檢查數據是否有效
-//        if (red < MIN_COLOR_THRESHOLD && green < MIN_COLOR_THRESHOLD && blue < MIN_COLOR_THRESHOLD) {
-//            telemetry.addData("Status", "Signal too weak");
-//            return DetectedColor.UNKNOWN;
+//        switch (position) {
+//            case 1:
+//                servo1.setPosition(SERVO_ACTIVE_POSITION);
+//                telemetry.addData("Servo Status", "Position 1 (s0) Activated");
+//                break;
+//            case 2:
+//                servo2.setPosition(SERVO_ACTIVE_POSITION);
+//                telemetry.addData("Servo Status", "Position 2 (s1) Activated");
+//                break;
+//            case 3:
+//                servo3.setPosition(SERVO_ACTIVE_POSITION);
+//                telemetry.addData("Servo Status", "Position 3 (s2) Activated");
+//                break;
+//            default:
+//                telemetry.addData("Servo Error", "Invalid position: " + position);
+//                return;
 //        }
 //
-//        // 修正：交換綠色和紫色的判斷邏輯
-//        // 紫色物體的藍色值最高
-//        if (blue > 0.0035f && blue > green && blue > red) {
-//            telemetry.addData("Logic", "PURPLE detected - Blue is highest");
+//        sleep(800);
+//
+//        switch (position) {
+//            case 1: servo1.setPosition(SERVO_REST_POSITION); break;
+//            case 2: servo2.setPosition(SERVO_REST_POSITION); break;
+//            case 3: servo3.setPosition(SERVO_REST_POSITION); break;
+//        }
+//
+//        telemetry.addData("Servo Action", "Completed for Position " + position);
+//    }
+//
+//    private void driveRobot() {
+//        double x = gamepad1.left_stick_x;
+//        double y = -gamepad1.left_stick_y; // Y stick value is reversed
+//        double rx = gamepad1.right_stick_x;
+//
+//        double theta = Math.atan2(y, x);
+//        double power = Math.hypot(x, y);
+//
+//        double sin = Math.sin(theta - Math.PI/4);
+//        double cos = Math.cos(theta - Math.PI/4);
+//        double max = Math.max(Math.abs(sin), Math.abs(cos));
+//
+//        double frontLeftPower = power * cos/max + rx;
+//        double frontRightPower = power * sin/max - rx;
+//        double backLeftPower = power * sin/max + rx;
+//        double backRightPower = power * cos/max - rx;
+//
+//        if ((power + Math.abs(rx)) > 1) {
+//            frontLeftPower /= power + Math.abs(rx);
+//            frontRightPower /= power + Math.abs(rx);
+//            backLeftPower /= power + Math.abs(rx);
+//            backRightPower /= power + Math.abs(rx);
+//        }
+//
+//        if(gamepad1.dpad_up){
+//            intakeMotor4.setPower(1);
+////            intakeMotor5.setPower(-1);
+//        }
+//        if(gamepad1.dpad_down){
+//            intakeMotor4.setPower(0);
+////            intakeMotor5.setPower(0);
+//        }
+//
+//        frontLeftMotor.setPower(frontLeftPower);
+//        backLeftMotor.setPower(backLeftPower);
+//        frontRightMotor.setPower(frontRightPower);
+//        backRightMotor.setPower(backRightPower);
+//    }
+//
+//    private DetectedColor getPositionColor(int position, Telemetry telemetry) {
+//        switch (position) {
+//            case 1:
+//                // Servo1 使用 sensor0 和 sensor1
+//                return getCombinedColor(colorSensor0, colorSensor1, "Position1", telemetry);
+//            case 2:
+//                // Servo2 使用 sensor2 和 sensor3
+//                return getCombinedColor(colorSensor2, colorSensor3, "Position2", telemetry);
+//            case 3:
+//                // Servo3 使用 sensor4 和 sensor5
+//                return getCombinedColor(colorSensor4, colorSensor5, "Position3", telemetry);
+//            default:
+//                return DetectedColor.UNKNOWN;
+//        }
+//    }
+//
+//
+//    private DetectedColor getCombinedColor(NormalizedColorSensor sensor1, NormalizedColorSensor sensor2,
+//                                           String positionName, Telemetry telemetry) {
+//        DetectedColor color1 = getSingleSensorColor(sensor1, positionName + "-SensorA", telemetry);
+//        DetectedColor color2 = getSingleSensorColor(sensor2, positionName + "-SensorB", telemetry);
+//
+//        telemetry.addData(positionName + " - SensorA", color1);
+//        telemetry.addData(positionName + " - SensorB", color2);
+//
+//        // 優先返回確定的顏色
+//        if (color1 == DetectedColor.PURPLE || color2 == DetectedColor.PURPLE) {
 //            return DetectedColor.PURPLE;
 //        }
-//        // 綠色物體的綠色值最高
-//        else if (green > 0.0025f && green > blue && green > red) {
-//            telemetry.addData("Logic", "GREEN detected - Green is highest");
+//        if (color1 == DetectedColor.GREEN || color2 == DetectedColor.GREEN) {
 //            return DetectedColor.GREEN;
 //        }
 //
+//        // 兩個傳感器都檢測不到顏色 = UNKNOWN
 //        return DetectedColor.UNKNOWN;
 //    }
 //
-//    // 更精確的比率方法 - 修正版本
-//    public DetectedColor getDetectedColorByRatio(Telemetry telemetry) {
-//        NormalizedRGBA color = colorSensor.getNormalizedColors();
 //
+//    public DetectedColor getSingleSensorColor(NormalizedColorSensor sensor, String sensorName, Telemetry telemetry) {
+//        NormalizedRGBA color = sensor.getNormalizedColors();
 //        float red = color.red;
 //        float green = color.green;
 //        float blue = color.blue;
 //
-//        telemetry.addData("Red", "%.4f", red);
-//        telemetry.addData("Green", "%.4f", green);
-//        telemetry.addData("Blue", "%.4f", blue);
+//        // 顯示傳感器數據用於調試
+//        telemetry.addData(sensorName + " - R", "%.4f", red);
+//        telemetry.addData(sensorName + " - G", "%.4f", green);
+//        telemetry.addData(sensorName + " - B", "%.4f", blue);
 //
-//        // 計算總和
-//        float sum = red + green + blue;
-//        if (sum < 0.002f) { // 總和太小
-//            telemetry.addData("Status", "Signal too weak - sum: %.4f", sum);
-//            return DetectedColor.UNKNOWN;
-//        }
+//        // 計算顏色特徵
+//        float blueGreenDiff = blue - green;
+//        float total = red + green + blue;
 //
-//        // 計算比率
-//        float redRatio = red / sum;
-//        float greenRatio = green / sum;
-//        float blueRatio = blue / sum;
+//        // 計算歸一化的顏色比例
+//        float redRatio = red / total;
+//        float greenRatio = green / total;
+//        float blueRatio = blue / total;
 //
-//        telemetry.addData("Red %", "%.1f%%", redRatio * 100);
-//        telemetry.addData("Green %", "%.1f%%", greenRatio * 100);
-//        telemetry.addData("Blue %", "%.1f%%", blueRatio * 100);
+//        telemetry.addData(sensorName + " - R%", "%.1f%%", redRatio * 100);
+//        telemetry.addData(sensorName + " - G%", "%.1f%%", greenRatio * 100);
+//        telemetry.addData(sensorName + " - B%", "%.1f%%", blueRatio * 100);
 //
-//        // 修正：交換綠色和紫色的比率判斷
-//        // 紫色物體：藍色比例 > 45%
-//        if (blueRatio > 0.45f && blueRatio > greenRatio && blueRatio > redRatio) {
-//            telemetry.addData("Logic", "PURPLE - Blue ratio: %.1f%%", blueRatio * 100);
+//        // 檢測紫色：藍色比例高，紅色比例中等
+//        boolean isPurple = (blueRatio > 0.35f) && (redRatio > 0.25f) && (redRatio < 0.4f) && (blueGreenDiff > 0.05f);
+//
+//        // 檢測綠色：綠色比例高，藍色和紅色比例較低
+//        boolean isGreen = (greenRatio > 0.4f) && (blueRatio < 0.35f) && (redRatio < 0.35f) && (blueGreenDiff < -0.02f);
+//
+//        if (isPurple) {
 //            return DetectedColor.PURPLE;
-//        }
-//        // 綠色物體：綠色比例 > 40%
-//        else if (greenRatio > 0.40f && greenRatio > blueRatio && greenRatio > redRatio) {
-//            telemetry.addData("Logic", "GREEN - Green ratio: %.1f%%", greenRatio * 100);
+//        } else if (isGreen) {
 //            return DetectedColor.GREEN;
 //        }
 //
+//        // 不符合 PURPLE 或 GREEN 特徵 = UNKNOWN
 //        return DetectedColor.UNKNOWN;
 //    }
 //
-//    // 增強檢測方法 - 使用多種條件（修正版本）
-//    public DetectedColor getDetectedColorEnhanced(Telemetry telemetry) {
-//        NormalizedRGBA color = colorSensor.getNormalizedColors();
+//    // 自動發射序列
+//    private void executeFullFiringSequence(Telemetry telemetry) {
+//        telemetry.addLine("=== STARTING FULL FIRING SEQUENCE ===");
+//        telemetry.addData("Mode", currentColorMode);
+//        telemetry.update();
 //
-//        float red = color.red;
-//        float green = color.green;
-//        float blue = color.blue;
+//        // 檢測三個位置的顏色
+//        DetectedColor color1 = getPositionColor(1, telemetry);
+//        DetectedColor color2 = getPositionColor(2, telemetry);
+//        DetectedColor color3 = getPositionColor(3, telemetry);
 //
-//        telemetry.addData("Raw - R", "%.4f", red);
-//        telemetry.addData("Raw - G", "%.4f", green);
-//        telemetry.addData("Raw - B", "%.4f", blue);
+//        DetectedColor[] colors = {color1, color2, color3};
 //
-//        // 修正：交換條件檢測
-//        boolean possiblePurple = (blue > 0.003f) && (blue > green) && (blue > red);
-//        boolean possibleGreen = (green > 0.002f) && (green > blue) && (green > red);
+//        telemetry.addData("Position 1", color1);
+//        telemetry.addData("Position 2", color2);
+//        telemetry.addData("Position 3", color3);
+//        telemetry.update();
 //
-//        // 檢查信號強度
-//        float maxVal = Math.max(Math.max(red, green), blue);
-//        boolean hasGoodSignal = maxVal > 0.002f;
+//        // 決定發射順序
+//        int[] firingOrder = determineFiringOrder(colors, telemetry);
 //
-//        telemetry.addData("Max Value", "%.4f", maxVal);
-//        telemetry.addData("Good Signal", hasGoodSignal);
-//        telemetry.addData("Possible Purple", possiblePurple);
-//        telemetry.addData("Possible Green", possibleGreen);
+//        // 執行發射序列 - 所有三個位置都會發射
+//        telemetry.addLine("--- Executing Firing Sequence ---");
+//        for (int i = 0; i < firingOrder.length; i++) {
+//            if (firingOrder[i] != -1) {
+//                DetectedColor currentColor = colors[firingOrder[i] - 1];
+//                String ballStatus = (currentColor == DetectedColor.UNKNOWN) ? "UNKNOWN" : currentColor.toString() + " BALL";
 //
-//        if (hasGoodSignal) {
-//            if (possiblePurple && !possibleGreen) {
-//                return DetectedColor.PURPLE;
-//            } else if (possibleGreen && !possiblePurple) {
-//                return DetectedColor.GREEN;
+//                telemetry.addData("Firing", "Position " + firingOrder[i] + " (" + ballStatus + ") - Step " + (i + 1));
+//                telemetry.update();
+//                activateServo(firingOrder[i]);
+//                if (i < firingOrder.length - 1) {
+//                    sleep(FIRING_INTERVAL_MS);
+//                }
 //            }
 //        }
 //
-//        return DetectedColor.UNKNOWN;
+//        telemetry.addLine("=== FIRING SEQUENCE COMPLETED ===");
+//        telemetry.addData("All Positions", "All 3 positions fired");
+//        telemetry.update();
 //    }
 //
-//    // 簡單檢測方法 - 修正版本
-//    public DetectedColor getDetectedColorSimple(Telemetry telemetry) {
-//        NormalizedRGBA color = colorSensor.getNormalizedColors();
+//    // 發射順序決策方法
+//    private int[] determineFiringOrder(DetectedColor[] colors, Telemetry telemetry) {
+//        int[] firingOrder = {-1, -1, -1};
+//        boolean[] positionUsed = new boolean[3];
+//        int orderIndex = 0;
 //
-//        float red = color.red;
-//        float green = color.green;
-//        float blue = color.blue;
+//        telemetry.addLine("--- Determining Firing Order ---");
 //
-//        telemetry.addData("R", "%.4f", red);
-//        telemetry.addData("G", "%.4f", green);
-//        telemetry.addData("B", "%.4f", blue);
+//        // 第一步：優先發射有球的位置，按照當前模式的理想順序
+//        DetectedColor[] idealOrder = getIdealColorOrder();
 //
-//        // 最簡單的邏輯：哪個顏色值最高就判斷為什麼顏色（修正版本）
-//        float maxValue = Math.max(Math.max(red, green), blue);
-//
-//        // 修正：交換判斷條件
-//        if (maxValue == blue && blue > 0.003f) {
-//            telemetry.addData("Logic", "PURPLE - Blue is highest");
-//            return DetectedColor.PURPLE;
-//        }
-//        else if (maxValue == green && green > 0.002f) {
-//            telemetry.addData("Logic", "GREEN - Green is highest");
-//            return DetectedColor.GREEN;
+//        for (DetectedColor targetColor : idealOrder) {
+//            int position = findColorPosition(colors, targetColor, positionUsed, telemetry);
+//            if (position != -1) {
+//                firingOrder[orderIndex++] = position;
+//                positionUsed[position - 1] = true;
+//                telemetry.addData("Priority Shot", "Position " + position + " - " + targetColor);
+//            }
 //        }
 //
-//        return DetectedColor.UNKNOWN;
+//        // 第二步：發射所有剩餘的位置（包括 UNKNOWN 的位置）
+//        for (int i = 0; i < colors.length; i++) {
+//            if (!positionUsed[i]) {
+//                firingOrder[orderIndex++] = i + 1;
+//                positionUsed[i] = true;
+//                telemetry.addData("Remaining Position", "Position " + (i + 1) + " - " + colors[i]);
+//            }
+//        }
+//
+//        telemetry.addData("Final Firing Order",
+//                "Step1: %d, Step2: %d, Step3: %d",
+//                firingOrder[0], firingOrder[1], firingOrder[2]);
+//
+//        return firingOrder;
 //    }
 //
+//    // 獲取當前模式的理想顏色順序
+//    private DetectedColor[] getIdealColorOrder() {
+//        switch (currentColorMode) {
+//            case GREEN_PURPLE_PURPLE:
+//                return new DetectedColor[]{DetectedColor.GREEN, DetectedColor.PURPLE, DetectedColor.PURPLE};
+//            case PURPLE_GREEN_PURPLE:
+//                return new DetectedColor[]{DetectedColor.PURPLE, DetectedColor.GREEN, DetectedColor.PURPLE};
+//            case PURPLE_PURPLE_GREEN:
+//                return new DetectedColor[]{DetectedColor.PURPLE, DetectedColor.PURPLE, DetectedColor.GREEN};
+//            default:
+//                return new DetectedColor[]{DetectedColor.PURPLE, DetectedColor.PURPLE, DetectedColor.GREEN};
+//        }
+//    }
 //
-//
-//
+//    private int findColorPosition(DetectedColor[] colors, DetectedColor targetColor, boolean[] positionUsed, Telemetry telemetry) {
+//        for (int i = 0; i < colors.length; i++) {
+//            if (!positionUsed[i] && colors[i] == targetColor) {
+//                positionUsed[i] = true;
+//                return i + 1;
+//            }
+//        }
+//        return -1;
+//    }
 //
 //    @Override
 //    public void runOpMode() {
 //        init(hardwareMap);
 //
-//        telemetry.addData("Status", "Initialized - Color Logic Corrected");
-//        telemetry.addData("Detection Logic", "High Blue = PURPLE, High Green = GREEN");
-//        telemetry.addData("Controls", "A - Reset, X - Test Servo, Y - Switch Method");
+//        telemetry.addData("Status", "Initialized - Full Robot Control");
+//        telemetry.addData("Features", "Mecanum Drive + Color Sensor Auto Firing");
+//        telemetry.addData("Sensor Setup", "Each servo has 2 color sensors for robust detection");
+//        telemetry.addData("Detection Logic", "UNKNOWN when both sensors detect no color");
+//        telemetry.addData("Controls", "Left Stick - Drive, Right Stick - Rotate");
+//        telemetry.addData("Controls", "A/B/X - Change mode, LEFT BUMPER - Auto fire sequence");
+//        telemetry.addData("Firing Strategy", "All 3 positions fire, colored balls have priority");
+//        telemetry.addData("Current Mode", currentColorMode);
 //        telemetry.update();
-//        DcMotor intakeMotor = hardwareMap.get(DcMotor.class, "motor4");
-//        CRServo xuanzhuan = hardwareMap.get(CRServo.class,"servo0");
-//        Servo leftPushServo = hardwareMap.get(Servo.class,"servo1");
-//        Servo rightPushServo = hardwareMap.get(Servo.class,"servo2");
-//
-//        int detectionMethod = 0; // 0: Enhanced, 1: Simple, 2: Ratio
-//
-//
-//        boolean purple = false;
-//        boolean green = false;
-//        double leftPushON = 1;
-//        double leftPushOFF = 0;
-//        double rightPushON = 1;
-//        double rightPushOFF = 0;
-//        long startTime1 = 0;
-//        long currentTime1 = 0;
-//        long startTime2 = 0;
-//        long currentTime2 = 0;
-//        long startTime3 = 0;
-//        long currentTime3 = 0;
-//        long startTime4 = 0;
-//        long currentTime4 = 0;
-//        long startTime5 = 0;
-//        long currentTime5 = 0;
-//        long startTime6 = 0;
-//        long currentTime6 = 0;
-//        long startTime7 = 0;
-//        long currentTime7 = 0;
-//        long startTime = System.currentTimeMillis();
-//
-//        intakeMotor.setPower(0);
-//        leftPushServo.setPosition(leftPushOFF);
-//        rightPushServo.setPosition(rightPushOFF);
-//        xuanzhuan.setPower(0);
-//        purple = false;
-//        green = false;
-//
-//
 //
 //        waitForStart();
 //
 //        while (opModeIsActive()) {
-//            DetectedColor detectedColor;
+//            // 1. 處理車子移動（每循環都執行，即使在序列進行中）
+//            driveRobot();
 //
-//            // 根據選擇的方法進行檢測
-//            switch (detectionMethod) {
-//                case 0:
-//                    detectedColor = getDetectedColorEnhanced(telemetry);
-//                    telemetry.addData("Method", "Enhanced");
-//                    break;
-//                case 1:
-//                    detectedColor = getDetectedColorSimple(telemetry);
-//                    telemetry.addData("Method", "Simple");
-//                    break;
-//                case 2:
-//                    detectedColor = getDetectedColorByRatio(telemetry);
-//                    telemetry.addData("Method", "Ratio");
-//                    break;
-//                default:
-//                    detectedColor = getDetectedColorEnhanced(telemetry);
-//                    telemetry.addData("Method", "Enhanced (default)");
-//                    break;
+//            // 2. 處理模式選擇（無論序列是否進行中都可以操作）
+//            if (gamepad1.a) {
+//                currentColorMode = ColorMode.GREEN_PURPLE_PURPLE;
+//                telemetry.addData("Mode Changed", "GREEN_PURPLE_PURPLE");
+//                sleep(200);
+//            } else if (gamepad1.b) {
+//                currentColorMode = ColorMode.PURPLE_GREEN_PURPLE;
+//                telemetry.addData("Mode Changed", "PURPLE_GREEN_PURPLE");
+//                sleep(200);
+//            } else if (gamepad1.x) {
+//                currentColorMode = ColorMode.PURPLE_PURPLE_GREEN;
+//                telemetry.addData("Mode Changed", "PURPLE_PURPLE_GREEN");
+//                sleep(200);
+//
+//            // 3. 處理自動發射序列（使用非阻塞方式）
+//            if (gamepad1.left_bumper && !sequenceInProgress) {
+//                sequenceInProgress = true;
+//                // 不等待序列完成，立即繼續循環
+//                new Thread(() -> {
+//                    executeFullFiringSequence(telemetry);
+//                    sequenceInProgress = false;
+//                }).start();
+//                sleep(200); // 防止重複觸發
 //            }
 //
-//            telemetry.addData("Detected Color", detectedColor);
-//            if (detectedColor == DetectedColor.PURPLE) {
-//                purple = true;
-//                startTime3 = System.currentTimeMillis();
-//            } else if(detectedColor == DetectedColor.GREEN) {
-//                green = true;
-//                startTime4 = System.currentTimeMillis();
+//            telemetry.addLine("=== ROBOT STATUS ===");
+//            telemetry.addData("Current Mode", currentColorMode);
+//            telemetry.addData("Sequence Status", sequenceInProgress ? "IN PROGRESS" : "READY");
+//
+//            if (!sequenceInProgress) {
+//                DetectedColor color1 = getPositionColor(1, telemetry);
+//                DetectedColor color2 = getPositionColor(2, telemetry);
+//                DetectedColor color3 = getPositionColor(3, telemetry);
+//                telemetry.addData("Position 1", color1);
+//                telemetry.addData("Position 2", color2);
+//                telemetry.addData("Position 3", color3);
+//
+//                int ballCount = getBallCount(new DetectedColor[]{color1, color2, color3});
+//                telemetry.addData("Colored Balls", ballCount);
+//                telemetry.addData("Unknown/Empty", (3 - ballCount));
+//                telemetry.addData("Firing Strategy", "Will fire all 3 positions");
 //            }
 //
-//
-//
-//            if(purple){
-//                currentTime3 = System.currentTimeMillis() - startTime3;
-////                if(currentTime3>5000){
-////                    purple = false;
-////                }
-//            }
-//
-//            if(green){
-//                currentTime4 = System.currentTimeMillis() - startTime4;
-////                if(currentTime4>5000){
-////                    green = false;
-////                }
-//            }
-//            if(!gamepad1.x && !gamepad1.y){
-//                if(gamepad1.left_bumper){
-//                    if(purple){
-//                        leftPushServo.setPosition(leftPushON);
-//                    }else if(green){
-//                        rightPushServo.setPosition(rightPushON);
-//                    }
-//                    purple = false;
-//                    green = false;
-//
-//                }
-//
-//                if(!purple && !green){
-//                    leftPushServo.setPosition(leftPushOFF);
-//                    rightPushServo.setPosition(rightPushOFF);
-//                }
-//            }
-//
-//            if(gamepad1.x){
-//                leftPushServo.setPosition(leftPushON);
-//            }if(gamepad1.y){
-//                rightPushServo.setPosition(rightPushON);
-//            }
-//
-//
-//
-//
-//
-//
-//            if(gamepad1.a){
-//                intakeMotor.setPower(1);
-//                xuanzhuan.setPower(0.8);
-//            }else if(gamepad1.b){
-//                intakeMotor.setPower(0);
-//                xuanzhuan.setPower(0);
-//            }
-////
-////
-////
-//
-//            telemetry.addData("purple",purple);
-//            telemetry.addData("green",green);
-//            telemetry.addData("xuanzhuan",xuanzhuan.getPower());
-//            telemetry.addData("leftPushServo",leftPushServo.getPosition());
-//            telemetry.addData("rightPushServo",rightPushServo.getPosition());
-//            telemetry.addData("intakeMotor",intakeMotor.getPower());
-//
-//
-//
+//            telemetry.addData("Drive System", "Mecanum - Active");
+//            telemetry.addData("Intake System", "D-pad Up/Down to control");
 //            telemetry.update();
-//
-//
 //        }
 //    }
+//
+//
 //}
-//
-//
-
-package org.firstinspires.ftc.teamcode.decode;
-
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
-import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
-import com.qualcomm.robotcore.hardware.NormalizedRGBA;
-import com.qualcomm.robotcore.hardware.Servo;
-import org.firstinspires.ftc.robotcore.external.Telemetry;
-
-@TeleOp(name = "testTeleop_v1")
-public class testTeleop_v1 extends LinearOpMode {
-
-    NormalizedColorSensor colorSensor1;
-    NormalizedColorSensor colorSensor2;
-    NormalizedColorSensor colorSensor3;
-
-    // 根據您的實際數據調整的顏色閾值
-    private static final float MIN_COLOR_THRESHOLD = 0.005f;
-
-    // 伺服馬達位置
-    private static final double SERVO_ACTIVE_POSITION = 0.7; // 移動到 0.7
-    private static final double SERVO_REST_POSITION = 0.0;   // 回到 0
-
-    // 三個位置的伺服馬達
-    Servo servo1;
-    Servo servo2;
-    Servo servo3;
-
-    // 顏色檢測結果
-    public enum DetectedColor {
-        PURPLE,
-        GREEN,
-        UNKNOWN
-    }
-
-    // 目標顏色模式
-    public enum ColorMode {
-        GREEN_PURPLE_PURPLE,  // A按鈕
-        PURPLE_GREEN_PURPLE,  // B按鈕
-        PURPLE_PURPLE_GREEN   // X按鈕
-    }
-
-    private ColorMode currentColorMode = ColorMode.GREEN_PURPLE_PURPLE;
-
-    public void init(HardwareMap hwMap) {
-        // 初始化三個顏色傳感器
-        colorSensor1 = hwMap.get(NormalizedColorSensor.class, "colorSensor1");
-        colorSensor2 = hwMap.get(NormalizedColorSensor.class, "colorSensor2");
-        colorSensor3 = hwMap.get(NormalizedColorSensor.class, "colorSensor3");
-
-        // 初始化三個伺服馬達
-        servo1 = hwMap.get(Servo.class, "servo1");
-        servo2 = hwMap.get(Servo.class, "servo2");
-        servo3 = hwMap.get(Servo.class, "servo3");
-
-        // 重置伺服馬達位置
-        resetAllServos();
-    }
-
-    // 重置所有伺服馬達到初始位置
-    private void resetAllServos() {
-        servo1.setPosition(SERVO_ACTIVE_POSITION);
-        servo2.setPosition(SERVO_REST_POSITION);
-        servo3.setPosition(SERVO_REST_POSITION);
-    }
-
-    // 簡單檢測方法 - 基於您的數值範圍
-    public DetectedColor getDetectedColorSimple(NormalizedColorSensor sensor, String sensorName, Telemetry telemetry) {
-        NormalizedRGBA color = sensor.getNormalizedColors();
-
-        float red = color.red;
-        float green = color.green;
-        float blue = color.blue;
-
-        telemetry.addData(sensorName + " - R", "%.4f", red);
-        telemetry.addData(sensorName + " - G", "%.4f", green);
-        telemetry.addData(sensorName + " - B", "%.4f", blue);
-
-        // 簡單邏輯：根據您的數值範圍
-        // 紫色: 藍色 ~0.3 (很高)
-        // 綠色: 綠色 ~0.04, 藍色 ~0.027
-
-        if (blue > 0.1f) {
-            // 藍色值非常高 -> 紫色
-            telemetry.addData(sensorName + " Logic", "PURPLE - Very high blue");
-            return DetectedColor.PURPLE;
-        }
-        else if (green > 0.03f && green > blue) {
-            // 綠色值較高且大於藍色 -> 綠色
-            telemetry.addData(sensorName + " Logic", "GREEN - Green higher than blue");
-            return DetectedColor.GREEN;
-        }
-        else if (blue > 0.05f) {
-            // 中等藍色值 -> 也可能是紫色
-            telemetry.addData(sensorName + " Logic", "PURPLE - Medium blue");
-            return DetectedColor.PURPLE;
-        }
-
-        return DetectedColor.UNKNOWN;
-    }
-
-    // 激活指定位置的伺服馬達（新版本：0 -> 0.7 -> 停頓 300ms -> 0）
-    private void activateServo(int position, Telemetry telemetry) {
-        switch (position) {
-            case 1:
-                // 移動到 0.7
-                servo1.setPosition(SERVO_REST_POSITION);
-                telemetry.addData("Activated", "Servo 1 moving to 0.7");
-                break;
-            case 2:
-                // 移動到 0.7
-                servo2.setPosition(SERVO_ACTIVE_POSITION);
-                telemetry.addData("Activated", "Servo 2 moving to 0.7");
-                break;
-            case 3:
-                // 移動到 0.7
-                servo3.setPosition(SERVO_ACTIVE_POSITION);
-                telemetry.addData("Activated", "Servo 3 moving to 0.7");
-                break;
-        }
-
-        // 停頓 300 毫秒
-        sleep(300);
-
-        // 回到 0
-        resetAllServos();
-        telemetry.addData("Servo Action", "Returned to 0 after 300ms");
-    }
-
-    // 根據顏色模式處理三個位置的顏色
-    private void processColorSequence(Telemetry telemetry) {
-        // 檢測三個位置的顏色
-        DetectedColor color1 = getDetectedColorSimple(colorSensor1, "Sensor1", telemetry);
-        DetectedColor color2 = getDetectedColorSimple(colorSensor2, "Sensor2", telemetry);
-        DetectedColor color3 = getDetectedColorSimple(colorSensor3, "Sensor3", telemetry);
-
-        telemetry.addData("Position1 Color", color1);
-        telemetry.addData("Position2 Color", color2);
-        telemetry.addData("Position3 Color", color3);
-        telemetry.addData("Current Mode", currentColorMode);
-
-        // 根據當前模式處理
-        switch (currentColorMode) {
-            case GREEN_PURPLE_PURPLE: // A按鈕：綠-紫-紫
-                processGreenPurplePurple(color1, color2, color3, telemetry);
-                break;
-            case PURPLE_GREEN_PURPLE: // B按鈕：紫-綠-紫
-                processPurpleGreenPurple(color1, color2, color3, telemetry);
-                break;
-            case PURPLE_PURPLE_GREEN: // X按鈕：紫-紫-綠
-                processPurplePurpleGreen(color1, color2, color3, telemetry);
-                break;
-        }
-    }
-
-    // 處理綠-紫-紫模式
-    private void processGreenPurplePurple(DetectedColor c1, DetectedColor c2, DetectedColor c3, Telemetry telemetry) {
-        // 第一優先：位置1是綠色
-        if (c1 == DetectedColor.GREEN) {
-            activateServo(1, telemetry);
-            return;
-        }
-
-        // 第二優先：位置2是紫色
-        if (c2 == DetectedColor.PURPLE) {
-            activateServo(2, telemetry);
-            return;
-        }
-
-        // 第三優先：位置3是紫色
-        if (c3 == DetectedColor.PURPLE) {
-            activateServo(3, telemetry);
-            return;
-        }
-
-        // 如果沒有匹配的顏色，隨便激活一個有球的伺服馬達
-        activateAnyBall(c1, c2, c3, telemetry);
-    }
-
-    // 處理紫-綠-紫模式
-    private void processPurpleGreenPurple(DetectedColor c1, DetectedColor c2, DetectedColor c3, Telemetry telemetry) {
-        // 第一優先：位置1是紫色
-        if (c1 == DetectedColor.PURPLE) {
-            activateServo(1, telemetry);
-            return;
-        }
-
-        // 第二優先：位置2是綠色
-        if (c2 == DetectedColor.GREEN) {
-            activateServo(2, telemetry);
-            return;
-        }
-
-        // 第三優先：位置3是紫色
-        if (c3 == DetectedColor.PURPLE) {
-            activateServo(3, telemetry);
-            return;
-        }
-
-        // 如果沒有匹配的顏色，隨便激活一個有球的伺服馬達
-        activateAnyBall(c1, c2, c3, telemetry);
-    }
-
-    // 處理紫-紫-綠模式
-    private void processPurplePurpleGreen(DetectedColor c1, DetectedColor c2, DetectedColor c3, Telemetry telemetry) {
-        // 第一優先：位置1是紫色
-        if (c1 == DetectedColor.PURPLE) {
-            activateServo(1, telemetry);
-            return;
-        }
-
-        // 第二優先：位置2是紫色
-        if (c2 == DetectedColor.PURPLE) {
-            activateServo(2, telemetry);
-            return;
-        }
-
-        // 第三優先：位置3是綠色
-        if (c3 == DetectedColor.GREEN) {
-            activateServo(3, telemetry);
-            return;
-        }
-
-        // 如果沒有匹配的顏色，隨便激活一個有球的伺服馬達
-        activateAnyBall(c1, c2, c3, telemetry);
-    }
-
-    // 隨便激活一個有球的伺服馬達
-    private void activateAnyBall(DetectedColor c1, DetectedColor c2, DetectedColor c3, Telemetry telemetry) {
-        // 按位置1、2、3的順序激活第一個檢測到球的伺服馬達
-        if (c1 != DetectedColor.UNKNOWN) {
-            activateServo(1, telemetry);
-        } else if (c2 != DetectedColor.UNKNOWN) {
-            activateServo(2, telemetry);
-        } else if (c3 != DetectedColor.UNKNOWN) {
-            activateServo(3, telemetry);
-        } else {
-            telemetry.addData("Status", "No balls detected");
-        }
-    }
-
-    @Override
-    public void runOpMode() {
-        init(hardwareMap);
-
-        telemetry.addData("Status", "Initialized - Three Color Sensors");
-        telemetry.addData("Controls", "A - Green/Purple/Purple, B - Purple/Green/Purple, X - Purple/Purple/Green");
-        telemetry.addData("Current Mode", currentColorMode);
-        telemetry.addData("Servo Action", "0 -> 0.7 -> 300ms -> 0");
-        telemetry.addData("Color Logic", "Purple: High Blue (>0.1), Green: High Green (>0.03)");
-        telemetry.update();
-
-        waitForStart();
-
-        while (opModeIsActive()) {
-            // 處理按鈕輸入來切換顏色模式
-            if (gamepad1.a) {
-                currentColorMode = ColorMode.GREEN_PURPLE_PURPLE;
-                telemetry.addData("Mode Changed", "GREEN_PURPLE_PURPLE");
-                sleep(200); // 防止按鈕連按
-            } else if (gamepad1.b) {
-                currentColorMode = ColorMode.PURPLE_GREEN_PURPLE;
-                telemetry.addData("Mode Changed", "PURPLE_GREEN_PURPLE");
-                sleep(200); // 防止按鈕連按
-            } else if (gamepad1.x) {
-                currentColorMode = ColorMode.PURPLE_PURPLE_GREEN;
-                telemetry.addData("Mode Changed", "PURPLE_PURPLE_GREEN");
-                sleep(200); // 防止按鈕連按
-            }
-
-            // 使用左扳機鍵來觸發顏色檢測和伺服馬達激活
-            if (gamepad1.left_bumper) {
-                processColorSequence(telemetry);
-                sleep(200); // 防止連按
-            }
-
-            // 顯示當前狀態
-            telemetry.addData("Current Mode", currentColorMode);
-            telemetry.addData("Servo1 Position", servo1.getPosition());
-            telemetry.addData("Servo2 Position", servo2.getPosition());
-            telemetry.addData("Servo3 Position", servo3.getPosition());
-
-            telemetry.update();
-        }
-    }
-}

@@ -21,9 +21,9 @@ public class ColorSensorTest_AI_v4 extends LinearOpMode {
     Servo servo3; // s2
 
     // 根據 Blocks 程式修正位置值
-    private static final double SERVO_ACTIVE_POSITION = 0.7;   // 發射位置
+    private static final double SERVO_ACTIVE_POSITION = 0.8;   // 發射位置
     private static final double SERVO_REST_POSITION = 0.0;     // 休息位置 (Blocks中使用0)
-    private static final int FIRING_INTERVAL_MS = 2000;
+    private static final int FIRING_INTERVAL_MS = 300;
 
     private static final float MIN_COLOR_THRESHOLD = 0.005f;
 

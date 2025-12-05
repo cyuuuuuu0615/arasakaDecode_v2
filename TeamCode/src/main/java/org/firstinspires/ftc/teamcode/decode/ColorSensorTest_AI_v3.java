@@ -44,9 +44,9 @@ public class ColorSensorTest_AI_v3 extends LinearOpMode {
     public void init(HardwareMap hwMap) {
         // 初始化傳感器 - 注意：sensor0和sensor1對應同一個位置
         colorSensor0 = hwMap.get(NormalizedColorSensor.class, "colorSensor0");
-        colorSensor1 = hwMap.get(NormalizedColorSensor.class, "colorSensor1");
-        colorSensor2 = hwMap.get(NormalizedColorSensor.class, "colorSensor2");
-        colorSensor3 = hwMap.get(NormalizedColorSensor.class, "colorSensor3");
+//        colorSensor1 = hwMap.get(NormalizedColorSensor.class, "colorSensor1");
+//        colorSensor2 = hwMap.get(NormalizedColorSensor.class, "colorSensor2");
+//        colorSensor3 = hwMap.get(NormalizedColorSensor.class, "colorSensor3");
 
         // 初始化3個Servo
         servo1 = hwMap.get(Servo.class, "servo1");

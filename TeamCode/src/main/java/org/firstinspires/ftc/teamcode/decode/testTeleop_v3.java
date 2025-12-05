@@ -63,7 +63,7 @@ public class testTeleop_v3 extends LinearOpMode {
         servo3.setDirection(Servo.Direction.REVERSE);
 
         servo1.scaleRange(0, 0.5);
-        servo2.scaleRange(0, 0.5);
+        servo2.scaleRange(0, 1);
         servo3.scaleRange(0, 0.5);
 
         frontLeftMotor = hwMap.get(DcMotor.class, "motor1");
@@ -149,7 +149,7 @@ public class testTeleop_v3 extends LinearOpMode {
 
         if(gamepad1.dpad_up){
             intakeMotor4.setPower(1);
-            intakeMotor5.setPower(1);
+            intakeMotor5.setPower(-1);
         }
         if(gamepad1.dpad_down){
             intakeMotor4.setPower(0);
