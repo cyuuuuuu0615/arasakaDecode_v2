@@ -7,7 +7,7 @@ import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.Servo;
 
-@TeleOp(name = "teleop_v4")
+@TeleOp(name = "teleop_v4 work")
 public class teleop_v4 extends LinearOpMode {
 
     // === 硬件變量 ===
