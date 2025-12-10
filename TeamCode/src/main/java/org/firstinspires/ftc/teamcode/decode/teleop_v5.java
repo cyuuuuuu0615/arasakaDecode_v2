@@ -13,74 +13,88 @@ public class teleop_v5 extends LinearOpMode {
 
     // === 硬件變量 ===
     NormalizedColorSensor colorSensor;
-
-    // Servos
-    Servo kickerServo;  // servo1: 長棍 (踢球用)
-    Servo diskServo;    // servo2: 圓盤 (轉動用)
-    Servo gateServoL;   // servo4: 左閘門
-    Servo gateServoR;   // servo5: 右閘門
-
-    // Motors
-    DcMotor intakeMotor;  // motor4: 進球馬達 (常開)
-    DcMotor shooterMotor; // motor5: 發射馬達 (發射時開)
+    Servo kickerServo, diskServo, gateServoL, gateServoR;
+    DcMotor intakeMotor, shooterMotor;
     DcMotor frontLeftMotor, frontRightMotor, backLeftMotor, backRightMotor;
 
 
-    // === 參數設定 ===
-    // 圓盤位置 (Filling)
-    private static final double FILL_POS_STEP_1 = 0.0;  // Hole A @ Sensor
-    private static final double FILL_POS_STEP_2 = 0.3529; // Hole B @ Sensor
-    private static final double FILL_POS_STEP_3 = 0.7137; // Hole C @ Sensor
+    // === 參數設定 (維持不變) ===
+    private static final double FILL_POS_STEP_1 = 0.0;
+    private static final double FILL_POS_STEP_2 = 0.3529;
+    private static final double FILL_POS_STEP_3 = 0.7137;
 
-    // 圓盤位置 (Firing)
     private static final double FIRE_POS_HOLE_B = 0.0471;
     private static final double FIRE_POS_HOLE_C = 0.4314;
     private static final double FIRE_POS_HOLE_A = 0.8196;
 
-    // 長棍 (Kicker) 邏輯位置 (物理範圍已被限制在 0.0-0.5)
     private static final double KICKER_REST = 0.0;
     private static final double KICKER_EXTEND = 0.8;
-    private static final int KICKER_WAIT_MS = 300;
 
-    // 閘門 (Gate) 位置
-    // 0.0 = 開閘 (球可以進入)
-    // 1.0 = 關閘 (球不會飛出)
-    private static final double GATE_OPEN = 0.0;
-    private static final double GATE_CLOSED = 1.0;
+    // 時間參數 (ms)
+    private static final int TIME_BALL_SETTLE = 800;  // 球穩定的時間
+    private static final int TIME_DISK_MOVE = 500;    // 圓盤轉動時間
+    private static final int TIME_SHOOTER_SPIN = 1000;// 發射輪加速時間
+    private static final int TIME_KICK_OUT = 300;     // 踢出時間
+    private static final int TIME_KICK_RETRACT = 250; // 收回時間
 
-    // 傳感器
+    private static final double GATE_CLOSED = 0.0;
+    private static final double GATE_L_OPEN = 0.6667;
+    private static final double GATE_R_OPEN = 0.6902;
+
     private static final float SENSOR_GAIN = 25.0f;
     private static final float MIN_DETECT_BRIGHTNESS = 0.7f;
     private static final float PURPLE_RATIO_LIMIT = 1.2f;
+    private static final double INTAKE_POWER = -1.0;
 
-    // === 狀態變量 ===
-    private int currentFillStep = 0; // 0, 1, 2, 3(Full)
-    private boolean isFiringMode = false; // 是否正在發射模式中
+    // === 狀態機定義 ===
 
-    // 球體狀態
-    private boolean hasBallA = false;
-    private boolean hasBallB = false;
-    private boolean hasBallC = false;
+    // 裝球狀態機
+    private enum FillState {
+        IDLE,           // 等待球
+        WAIT_SETTLE,    // 球剛進入，等待穩定
+        ROTATING,       // 圓盤轉動中
+        FULL            // 已滿
+    }
 
-    // 顏色紀錄
-    private String colorHoleA = "EMPTY";
-    private String colorHoleB = "EMPTY";
-    private String colorHoleC = "EMPTY";
+    // 發射狀態機
+    private enum FireState {
+        IDLE,           // 閒置
+        PREPARING,      // 關閘門，發射輪加速
+        DECIDING,       // 決定下一個要射哪個洞
+        AIMING,         // 圓盤轉向目標洞
+        KICKING,        // 長棍踢出
+        RETRACTING,     // 長棍收回
+        RESETTING       // 發射完畢，復位
+    }
+
+    // === 運行時變量 ===
+    private FillState fillState = FillState.IDLE;
+    private FireState fireState = FireState.IDLE;
+
+    private long fillTimer = 0;
+    private long fireTimer = 0;
+
+    private int currentFillStep = 0;
+    private boolean hasBallA = false, hasBallB = false, hasBallC = false;
+    private String colorHoleA = "EMPTY", colorHoleB = "EMPTY", colorHoleC = "EMPTY";
+
+    // 臨時變量，用於發射邏輯
+    private double targetFirePos = 0;
+    private String currentTargetHole = "";
 
     public enum DetectedColor { PURPLE, GREEN, UNKNOWN }
 
     @Override
     public void runOpMode() {
-        // 1. 初始化硬件
         initHardware();
 
-        telemetry.addData("Status", "System Initialized");
-        telemetry.addData("Gate Status", "OPEN (Pos: 0.0)");
+        telemetry.addData("Status", "Non-Blocking Initialized");
         telemetry.update();
 
         waitForStart();
 
         while (opModeIsActive()) {
+
 
 
             double x = gamepad1.left_stick_x;
@@ -108,235 +122,294 @@ public class teleop_v5 extends LinearOpMode {
             }
 
 
+
+
             frontLeftMotor.setPower(frontLeftPower);
             backLeftMotor.setPower(backLeftPower);
             frontRightMotor.setPower(frontRightPower);
             backRightMotor.setPower(backRightPower);
 
 
-            // === 1. 發射模式控制 (Left Bumper) ===
-            if (gamepad1.left_bumper && !isFiringMode) {
-                // 如果還有球，才允許發射
+            // 1. 發射觸發 (只有在閒置時才能觸發)
+            if (gamepad1.left_bumper && fireState == FireState.IDLE) {
                 if (hasBallA || hasBallB || hasBallC) {
-                    performFiringSequence();
+                    // 開始發射流程
+                    fireState = FireState.PREPARING;
+                    fireTimer = System.currentTimeMillis();
+
+                    // 執行初始化動作
+                    controlGates(false); // 關閘
+                    shooterMotor.setPower(0.8); // 開發射輪
                 }
             }
 
-            // === 2. 進球馬達控制 (Motor 4) ===
-            // 邏輯：如果沒滿 且 不在發射模式 -> 開啟馬達吸球
-            // 否則 (滿了 或 正在射) -> 關閉馬達
-            if (currentFillStep < 3 && !isFiringMode) {
-                intakeMotor.setPower(-1); // 吸球速度
-            } else {
-                intakeMotor.setPower(0.0);
-            }
+            // 2. 執行狀態機邏輯
+            runFiringLogic();   // 處理發射
+            runFillingLogic();  // 處理裝球
+            runIntakeLogic();   // 處理進球馬達
 
-            // === 3. 自動裝球邏輯 (Filling) ===
-            // 只有在非發射模式 且 沒滿的時候執行
-            if (!isFiringMode && currentFillStep < 3) {
-                handleFillingLogic();
-            }
-
-            // === 4. 更新顯示 ===
+            // 3. 顯示資訊
             updateTelemetry();
         }
     }
 
-    // === 初始化方法 ===
+    // === 狀態機邏輯：裝球 ===
+    private void runFillingLogic() {
+        // 如果正在發射，暫停裝球邏輯
+        if (fireState != FireState.IDLE) return;
+
+        // 如果滿了，狀態設為 FULL
+        if (currentFillStep >= 3) {
+            fillState = FillState.FULL;
+            return;
+        } else if (fillState == FillState.FULL) {
+            // 如果從滿變不滿 (例如剛發射完)，重置為 IDLE
+            fillState = FillState.IDLE;
+        }
+
+        switch (fillState) {
+            case IDLE:
+                // 檢測顏色
+                DetectedColor detectedColor = getDetectedColor(colorSensor);
+                if (detectedColor != DetectedColor.UNKNOWN) {
+                    // 記錄顏色
+                    recordBallColor(detectedColor);
+
+                    // 開始等待球穩定
+                    fillTimer = System.currentTimeMillis();
+                    fillState = FillState.WAIT_SETTLE;
+                }
+                break;
+
+            case WAIT_SETTLE:
+                // 等待球完全掉入 (TIME_BALL_SETTLE)
+                if (System.currentTimeMillis() - fillTimer > TIME_BALL_SETTLE) {
+                    // 轉動到下一個位置
+                    moveToNextFillPosition();
+
+                    // 開始轉動計時
+                    fillTimer = System.currentTimeMillis();
+                    fillState = FillState.ROTATING;
+                }
+                break;
+
+            case ROTATING:
+                // 等待圓盤轉動完成 (TIME_DISK_MOVE)
+                if (System.currentTimeMillis() - fillTimer > TIME_DISK_MOVE) {
+                    // 轉動完成，回到 IDLE 等待下一顆球
+                    fillState = FillState.IDLE;
+                }
+                break;
+
+            case FULL:
+                // 什麼都不做，等待發射清空
+                break;
+        }
+    }
+
+    // === 狀態機邏輯：發射 ===
+    private void runFiringLogic() {
+        switch (fireState) {
+            case IDLE:
+                // 什麼都不做
+                break;
+
+            case PREPARING:
+                // 等待發射輪加速 (TIME_SHOOTER_SPIN)
+                if (System.currentTimeMillis() - fireTimer > TIME_SHOOTER_SPIN) {
+                    fireState = FireState.DECIDING;
+                }
+                break;
+
+            case DECIDING:
+                // 判斷還有沒有球，並選擇最短路徑
+                if (!hasBallA && !hasBallB && !hasBallC) {
+                    // 沒球了，結束
+                    fireTimer = System.currentTimeMillis();
+                    fireState = FireState.RESETTING;
+
+                    // 執行復位動作
+                    shooterMotor.setPower(0.0);
+                    diskServo.setPosition(FILL_POS_STEP_1);
+                } else {
+                    // 還有球，選擇目標
+                    selectBestTarget();
+
+                    // 執行瞄準動作
+                    diskServo.setPosition(targetFirePos);
+
+                    fireTimer = System.currentTimeMillis();
+                    fireState = FireState.AIMING;
+                }
+                break;
+
+            case AIMING:
+                // 等待圓盤轉到發射位 (TIME_DISK_MOVE)
+                if (System.currentTimeMillis() - fireTimer > TIME_DISK_MOVE) {
+                    // 執行踢球
+                    kickerServo.setPosition(KICKER_EXTEND);
+
+                    fireTimer = System.currentTimeMillis();
+                    fireState = FireState.KICKING;
+                }
+                break;
+
+            case KICKING:
+                // 等待踢出 (TIME_KICK_OUT)
+                if (System.currentTimeMillis() - fireTimer > TIME_KICK_OUT) {
+                    // 執行收回
+                    kickerServo.setPosition(KICKER_REST);
+
+                    // 清除該洞的球狀態
+                    clearBallStatus(currentTargetHole);
+
+                    fireTimer = System.currentTimeMillis();
+                    fireState = FireState.RETRACTING;
+                }
+                break;
+
+            case RETRACTING:
+                // 等待收回 (TIME_KICK_RETRACT)
+                if (System.currentTimeMillis() - fireTimer > TIME_KICK_RETRACT) {
+                    // 這一輪射擊完成，回到 DECIDING 判斷下一顆
+                    fireState = FireState.DECIDING;
+                }
+                break;
+
+            case RESETTING:
+                // 等待圓盤復位 (稍作等待確保圓盤轉回去)
+                if (System.currentTimeMillis() - fireTimer > 600) {
+                    controlGates(true); // 開閘
+                    currentFillStep = 0; // 重置計數
+                    fireState = FireState.IDLE;
+                }
+                break;
+        }
+    }
+
+    // === 進球馬達邏輯 ===
+    private void runIntakeLogic() {
+        // 只有在 (沒滿) 且 (不在發射狀態) 時開啟吸球
+        // 注意：fireState != IDLE 代表正在發射中
+        if (currentFillStep < 3 && fireState == FireState.IDLE) {
+            intakeMotor.setPower(INTAKE_POWER);
+        } else {
+            intakeMotor.setPower(0.0);
+        }
+    }
+
+    // === 輔助方法 ===
+
+    private void recordBallColor(DetectedColor color) {
+        switch (currentFillStep) {
+            case 0:
+                colorHoleA = color.toString();
+                hasBallA = true;
+                break;
+            case 1:
+                colorHoleB = color.toString();
+                hasBallB = true;
+                break;
+            case 2:
+                colorHoleC = color.toString();
+                hasBallC = true;
+                break;
+        }
+    }
+
+    private void moveToNextFillPosition() {
+        if (currentFillStep == 0) {
+            diskServo.setPosition(FILL_POS_STEP_2);
+            currentFillStep = 1;
+        } else if (currentFillStep == 1) {
+            diskServo.setPosition(FILL_POS_STEP_3);
+            currentFillStep = 2;
+        } else if (currentFillStep == 2) {
+            // 滿了，不轉動
+            currentFillStep = 3;
+        }
+    }
+
+    private void selectBestTarget() {
+        double currentPos = diskServo.getPosition();
+        double distA = hasBallA ? Math.abs(currentPos - FIRE_POS_HOLE_A) : 999.0;
+        double distB = hasBallB ? Math.abs(currentPos - FIRE_POS_HOLE_B) : 999.0;
+        double distC = hasBallC ? Math.abs(currentPos - FIRE_POS_HOLE_C) : 999.0;
+
+        if (distA <= distB && distA <= distC) {
+            targetFirePos = FIRE_POS_HOLE_A;
+            currentTargetHole = "A";
+        } else if (distB <= distA && distB <= distC) {
+            targetFirePos = FIRE_POS_HOLE_B;
+            currentTargetHole = "B";
+        } else {
+            targetFirePos = FIRE_POS_HOLE_C;
+            currentTargetHole = "C";
+        }
+    }
+
+    private void clearBallStatus(String hole) {
+        if (hole.equals("A")) { hasBallA = false; colorHoleA = "EMPTY"; }
+        if (hole.equals("B")) { hasBallB = false; colorHoleB = "EMPTY"; }
+        if (hole.equals("C")) { hasBallC = false; colorHoleC = "EMPTY"; }
+    }
+
+    private void controlGates(boolean isOpen) {
+        if (isOpen) {
+            gateServoL.setPosition(GATE_L_OPEN);
+            gateServoR.setPosition(GATE_R_OPEN);
+        } else {
+            gateServoL.setPosition(GATE_CLOSED);
+            gateServoR.setPosition(GATE_CLOSED);
+        }
+    }
+
     private void initHardware() {
-        // Sensors
         colorSensor = hardwareMap.get(NormalizedColorSensor.class, "colorSensor1");
         if (colorSensor instanceof com.qualcomm.robotcore.hardware.SwitchableLight) {
             ((com.qualcomm.robotcore.hardware.SwitchableLight)colorSensor).enableLight(true);
         }
         colorSensor.setGain(SENSOR_GAIN);
 
-        // Servos
         kickerServo = hardwareMap.get(Servo.class, "servo1");
         diskServo = hardwareMap.get(Servo.class, "servo2");
         gateServoL = hardwareMap.get(Servo.class, "servo4");
         gateServoR = hardwareMap.get(Servo.class, "servo5");
 
-        // Motors
         intakeMotor = hardwareMap.get(DcMotor.class, "motor4");
         shooterMotor = hardwareMap.get(DcMotor.class, "motor5");
         frontLeftMotor = hardwareMap.get(DcMotor.class, "motor1");
         backLeftMotor = hardwareMap.get(DcMotor.class, "motor2");
         frontRightMotor = hardwareMap.get(DcMotor.class, "motor0");
         backRightMotor = hardwareMap.get(DcMotor.class, "motor3");
+
+
+
+
+        frontLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        backLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         frontRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         frontLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        frontLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
-        backLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
-        shooterMotor.setDirection(DcMotorSimple.Direction.REVERSE);
 
-
-        // --- Servo 設定 ---
-        // 1. Kicker (長棍) 範圍限制
         kickerServo.scaleRange(0.0, 0.5);
 
-        // 2. Gate (閘門) 方向修正 [更新部分]
-        // 根據您的反饋，將兩個方向反轉
-        gateServoL.setDirection(Servo.Direction.FORWARD); // 修正：左邊改為 Forward
-        gateServoR.setDirection(Servo.Direction.REVERSE); // 修正：右邊改為 Reverse
+        // 依照之前的設定
+        gateServoL.setDirection(Servo.Direction.REVERSE);
+        gateServoR.setDirection(Servo.Direction.FORWARD);
+        shooterMotor.setDirection(DcMotorSimple.Direction.REVERSE);
 
-        // 初始狀態
-        kickerServo.setPosition(KICKER_REST);
-        diskServo.setPosition(FILL_POS_STEP_1);
-
-        // 閘門初始開啟 (為了進球)
-        controlGates(true); // Open
-
-        // 馬達初始關閉
-        intakeMotor.setPower(0);
-        shooterMotor.setPower(0);
         intakeMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         shooterMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
-    }
 
-    // === 核心邏輯：裝球 ===
-    private void handleFillingLogic() {
-        DetectedColor detectedColor = getDetectedColor(colorSensor);
-
-        if (detectedColor != DetectedColor.UNKNOWN) {
-            // 檢測到球
-
-            // 1. 先記錄
-            switch (currentFillStep) {
-                case 0:
-                    colorHoleA = detectedColor.toString();
-                    hasBallA = true;
-                    telemetry.addData("Event", "Got Ball A -> Moving");
-                    telemetry.update();
-                    // 轉動到 Step 2
-                    safeRotateDisk(FILL_POS_STEP_2);
-                    currentFillStep = 1;
-                    break;
-
-                case 1:
-                    colorHoleB = detectedColor.toString();
-                    hasBallB = true;
-                    telemetry.addData("Event", "Got Ball B -> Moving");
-                    telemetry.update();
-                    // 轉動到 Step 3
-                    safeRotateDisk(FILL_POS_STEP_3);
-                    currentFillStep = 2;
-                    break;
-
-                case 2:
-                    colorHoleC = detectedColor.toString();
-                    hasBallC = true;
-                    telemetry.addData("Event", "Got Ball C -> Full");
-                    telemetry.update();
-                    // 滿了，不轉動
-                    currentFillStep = 3;
-                    break;
-            }
-            // 等待球穩定，避免重複讀取
-            sleep(800);
-        }
-    }
-
-    // === 核心邏輯：發射序列 ===
-    private void performFiringSequence() {
-        isFiringMode = true; // 標記為發射模式 (自動關閉 Intake Motor)
-
-        // 1. 啟動發射馬達 (Motor 5)
-        shooterMotor.setPower(0.8);
-        telemetry.addData("Mode", "SHOOTER SPINNING UP...");
-        telemetry.update();
-
-        // 關閉閘門 (防止球在發射移動過程中飛出)
-        controlGates(false); // Close
-
-        sleep(1000); // 等待發射輪達到速度
-
-        // 2. 循環發射直到沒球
-        while (opModeIsActive() && (hasBallA || hasBallB || hasBallC)) {
-
-            double currentPos = diskServo.getPosition();
-
-            // 計算距離
-            double distA = hasBallA ? Math.abs(currentPos - FIRE_POS_HOLE_A) : 999.0;
-            double distB = hasBallB ? Math.abs(currentPos - FIRE_POS_HOLE_B) : 999.0;
-            double distC = hasBallC ? Math.abs(currentPos - FIRE_POS_HOLE_C) : 999.0;
-
-            // 選擇最短路徑發射
-            if (distA <= distB && distA <= distC) {
-                shootOneBall(FIRE_POS_HOLE_A, "A");
-                hasBallA = false;
-                colorHoleA = "EMPTY";
-            } else if (distB <= distA && distB <= distC) {
-                shootOneBall(FIRE_POS_HOLE_B, "B");
-                hasBallB = false;
-                colorHoleB = "EMPTY";
-            } else {
-                shootOneBall(FIRE_POS_HOLE_C, "C");
-                hasBallC = false;
-                colorHoleC = "EMPTY";
-            }
-        }
-
-        // 3. 發射結束清理
-        shooterMotor.setPower(0.0); // 關閉發射馬達
-
-        telemetry.addData("Mode", "FIRING DONE - RESETTING");
-        telemetry.update();
-
-        // 回到初始位置
-        diskServo.setPosition(FILL_POS_STEP_1);
-        sleep(600);
-
-        // 打開閘門 (準備重新進球)
-        controlGates(true); // Open
-
-        currentFillStep = 0;
-        isFiringMode = false; // 解除發射模式 (Intake Motor 會自動重啟)
-    }
-
-    // === 動作輔助方法 ===
-
-    // 單次射擊動作
-    private void shootOneBall(double targetPos, String holeName) {
-        telemetry.addData("Action", "Shooting Hole " + holeName);
-        telemetry.update();
-
-        // 轉動圓盤 (閘門保持關閉)
-        diskServo.setPosition(targetPos);
-        sleep(500); // 等待到位
-
-        // Kicker 動作 (長棍)
-        kickerServo.setPosition(KICKER_EXTEND);
-        sleep(KICKER_WAIT_MS);
         kickerServo.setPosition(KICKER_REST);
-        sleep(250);
+        diskServo.setPosition(FILL_POS_STEP_1);
+        controlGates(true);
+        intakeMotor.setPower(0);
+        shooterMotor.setPower(0);
     }
 
-    // 安全轉動圓盤 (用於裝球階段)
-    private void safeRotateDisk(double targetPos) {
-        // 1. 關閘門 (安全)
-        controlGates(false); // Close
-        sleep(200);
-
-        // 2. 轉動
-        diskServo.setPosition(targetPos);
-        sleep(500);
-
-        // 3. 開閘門 (進球)
-        controlGates(true); // Open
-        sleep(200);
-    }
-
-    // 控制閘門開關 (isOpen: true=開/0, false=關/1)
-    private void controlGates(boolean isOpen) {
-        double pos = isOpen ? GATE_OPEN : GATE_CLOSED;
-        gateServoL.setPosition(pos);
-        gateServoR.setPosition(pos);
-    }
-
-    // 顏色檢測
     public DetectedColor getDetectedColor(NormalizedColorSensor sensor) {
         NormalizedRGBA color = sensor.getNormalizedColors();
         if (color.alpha < MIN_DETECT_BRIGHTNESS) return DetectedColor.UNKNOWN;
@@ -350,15 +423,15 @@ public class teleop_v5 extends LinearOpMode {
         return DetectedColor.UNKNOWN;
     }
 
-    // 用於顯示的 Telemetry
     private void updateTelemetry() {
-        telemetry.addLine("=== STATUS ===");
-        if (isFiringMode) {
-            telemetry.addData("State", "FIRING MODE (Motor5 ON)");
-        } else if (currentFillStep >= 3) {
-            telemetry.addData("State", "FULL (Intake OFF)");
+        telemetry.addLine("=== SYSTEM STATUS ===");
+        telemetry.addData("Fill State", fillState);
+        telemetry.addData("Fire State", fireState);
+
+        if (fireState != FireState.IDLE) {
+            telemetry.addData("Action", "FIRING in progress...");
         } else {
-            telemetry.addData("State", "FILLING (Intake ON)");
+            telemetry.addData("Action", "Intake / Idle");
         }
 
         telemetry.addLine("\n=== BALLS ===");
