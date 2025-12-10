@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.decode;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.Servo;
@@ -22,17 +23,19 @@ public class teleop_v5 extends LinearOpMode {
     // Motors
     DcMotor intakeMotor;  // motor4: 進球馬達 (常開)
     DcMotor shooterMotor; // motor5: 發射馬達 (發射時開)
+    DcMotor frontLeftMotor, frontRightMotor, backLeftMotor, backRightMotor;
+
 
     // === 參數設定 ===
     // 圓盤位置 (Filling)
     private static final double FILL_POS_STEP_1 = 0.0;  // Hole A @ Sensor
-    private static final double FILL_POS_STEP_2 = 0.37; // Hole B @ Sensor
-    private static final double FILL_POS_STEP_3 = 0.73; // Hole C @ Sensor
+    private static final double FILL_POS_STEP_2 = 0.3529; // Hole B @ Sensor
+    private static final double FILL_POS_STEP_3 = 0.7137; // Hole C @ Sensor
 
     // 圓盤位置 (Firing)
-    private static final double FIRE_POS_HOLE_B = 0.0706;
-    private static final double FIRE_POS_HOLE_C = 0.481;
-    private static final double FIRE_POS_HOLE_A = 0.8039;
+    private static final double FIRE_POS_HOLE_B = 0.0471;
+    private static final double FIRE_POS_HOLE_C = 0.4314;
+    private static final double FIRE_POS_HOLE_A = 0.8196;
 
     // 長棍 (Kicker) 邏輯位置 (物理範圍已被限制在 0.0-0.5)
     private static final double KICKER_REST = 0.0;
@@ -79,6 +82,38 @@ public class teleop_v5 extends LinearOpMode {
 
         while (opModeIsActive()) {
 
+
+            double x = gamepad1.left_stick_x;
+            double y = -gamepad1.left_stick_y; // Remember, Y stick value is reversed
+            double rx = gamepad1.right_stick_x;
+
+            double theta = Math.atan2(y, x);
+            double power = Math.hypot(x,y);
+
+            double sin = Math.sin(theta - Math.PI/4);
+            double cos = Math.cos(theta - Math.PI/4);
+            double max = Math.max(Math.abs(sin), Math.abs(cos));
+
+
+            double frontLeftPower = power * cos/max + rx;
+            double frontRightPower = power * sin/max - rx;
+            double backLeftPower = power * sin/max + rx;
+            double backRightPower = power * cos/max - rx;
+
+            if ((power + Math.abs(rx)) > 1){
+                frontLeftPower   /= power + Math.abs(rx);
+                frontRightPower /= power + Math.abs(rx);
+                backLeftPower    /= power + Math.abs(rx);
+                backRightPower  /= power + Math.abs(rx);
+            }
+
+
+            frontLeftMotor.setPower(frontLeftPower);
+            backLeftMotor.setPower(backLeftPower);
+            frontRightMotor.setPower(frontRightPower);
+            backRightMotor.setPower(backRightPower);
+
+
             // === 1. 發射模式控制 (Left Bumper) ===
             if (gamepad1.left_bumper && !isFiringMode) {
                 // 如果還有球，才允許發射
@@ -91,7 +126,7 @@ public class teleop_v5 extends LinearOpMode {
             // 邏輯：如果沒滿 且 不在發射模式 -> 開啟馬達吸球
             // 否則 (滿了 或 正在射) -> 關閉馬達
             if (currentFillStep < 3 && !isFiringMode) {
-                intakeMotor.setPower(0.8); // 吸球速度
+                intakeMotor.setPower(-1); // 吸球速度
             } else {
                 intakeMotor.setPower(0.0);
             }
@@ -125,6 +160,18 @@ public class teleop_v5 extends LinearOpMode {
         // Motors
         intakeMotor = hardwareMap.get(DcMotor.class, "motor4");
         shooterMotor = hardwareMap.get(DcMotor.class, "motor5");
+        frontLeftMotor = hardwareMap.get(DcMotor.class, "motor1");
+        backLeftMotor = hardwareMap.get(DcMotor.class, "motor2");
+        frontRightMotor = hardwareMap.get(DcMotor.class, "motor0");
+        backRightMotor = hardwareMap.get(DcMotor.class, "motor3");
+        frontRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        backRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        backLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        frontLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        frontLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        backLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        shooterMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+
 
         // --- Servo 設定 ---
         // 1. Kicker (長棍) 範圍限制

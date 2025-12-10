@@ -71,7 +71,8 @@ public class teleop extends LinearOpMode {
         frontLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         backLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         shootingMotor.setDirection(DcMotorSimple.Direction.REVERSE);
-        zhaServo4.setDirection(Servo.Direction.REVERSE);
+        intakeMotor4.setDirection(DcMotorSimple.Direction.REVERSE);
+        zhaServo5.setDirection(Servo.Direction.REVERSE);
         frontRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -129,17 +130,17 @@ public class teleop extends LinearOpMode {
                 intakeMotor4.setPower(0);
             }
             if(gamepad1.a){
-                baseServo.setPosition(0.0706);
+                baseServo.setPosition(0.0471);
                 zhaServo4.setPosition(1);
                 zhaServo5.setPosition(1);
             }
             if(gamepad1.b){
-                baseServo.setPosition(.4863);
+                baseServo.setPosition(.4314);
                 zhaServo4.setPosition(1);
                 zhaServo5.setPosition(1);
             }
             if(gamepad1.x){
-                baseServo.setPosition(.8039);
+                baseServo.setPosition(.8196);
                 zhaServo4.setPosition(1);
                 zhaServo5.setPosition(1);
             }
@@ -149,12 +150,12 @@ public class teleop extends LinearOpMode {
                 zhaServo5.setPosition(0);
             }
             if(gamepad1.dpad_left){
-                baseServo.setPosition(.73);
+                baseServo.setPosition(.7137);
                 zhaServo4.setPosition(0);
                 zhaServo5.setPosition(0);
             }
             if(gamepad1.dpad_right){
-                baseServo.setPosition(.37);
+                baseServo.setPosition(.3529);
                 zhaServo4.setPosition(0);
                 zhaServo5.setPosition(0);
             }
