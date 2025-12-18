@@ -45,7 +45,7 @@ public class teleop_v4 extends LinearOpMode {
     private static final float SENSOR_GAIN = 25.0f;
     private static final float MIN_DETECT_BRIGHTNESS = 0.7f;
     private static final float PURPLE_RATIO_LIMIT = 1.2f;
-    private static final double INTAKE_POWER = -1.0;
+    private static final double INTAKE_POWER = 1.0;
 
     // === 狀態機定義 ===
     private enum FillState { IDLE, WAIT_SETTLE, ROTATING, FULL }
