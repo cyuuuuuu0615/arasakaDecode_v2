@@ -127,6 +127,7 @@ public class teleop_v3 extends LinearOpMode {
 
             updateTelemetry();
         }
+
     }
 
     // === 裝球邏輯 ===

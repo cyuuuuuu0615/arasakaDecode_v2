@@ -74,5 +74,6 @@ public class LocalizationTest extends LinearOpMode {
         } else {
             throw new RuntimeException();
         }
+
     }
 }

@@ -59,5 +59,6 @@ public final class ManualFeedbackTuner extends LinearOpMode {
         } else {
             throw new RuntimeException();
         }
+
     }
 }

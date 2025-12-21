@@ -124,7 +124,7 @@ public class teleop extends LinearOpMode {
             }
 
             if(gamepad1.dpad_up){
-                intakeMotor4.setPower(1);
+                intakeMotor4.setPower(-1);
             }
             if(gamepad1.dpad_down){
                 intakeMotor4.setPower(0);
@@ -191,12 +191,6 @@ public class teleop extends LinearOpMode {
 
             telemetry.update();
         }
-
-
-
-
-
-
 
 
 

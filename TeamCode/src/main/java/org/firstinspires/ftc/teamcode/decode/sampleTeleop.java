@@ -118,11 +118,5 @@ public class sampleTeleop extends LinearOpMode {
 
 
 
-
-
-
-
-
-
     }
 }

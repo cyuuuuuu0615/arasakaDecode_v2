@@ -35,5 +35,6 @@ public final class SplineTest extends LinearOpMode {
         } else {
             throw new RuntimeException();
         }
+
     }
 }

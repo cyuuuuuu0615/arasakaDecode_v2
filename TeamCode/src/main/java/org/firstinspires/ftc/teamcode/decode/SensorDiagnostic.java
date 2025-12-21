@@ -40,7 +40,7 @@ public class SensorDiagnostic extends LinearOpMode {
             telemetry.update();
             // 如果抓不到硬體，程式會在這裡卡住等待停止
             waitForStart();
-            return;
+
         }
 
         telemetry.addData("操作說明", "按 A 鍵切換開關燈");
@@ -100,5 +100,6 @@ public class SensorDiagnostic extends LinearOpMode {
 
             telemetry.update();
         }
+
     }
 }

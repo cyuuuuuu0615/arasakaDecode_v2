@@ -108,6 +108,7 @@ public class ApriltagTesting extends LinearOpMode {
 
         setDrive(0, 0, 0);
         if (portal != null) portal.close();
+
     }
 
     private void ensureVisionStreaming() {

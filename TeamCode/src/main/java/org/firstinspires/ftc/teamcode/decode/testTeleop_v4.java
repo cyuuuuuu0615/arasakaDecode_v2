@@ -119,6 +119,7 @@ public class testTeleop_v4 extends LinearOpMode {
             // 更新telemetry
             updateTelemetry();
         }
+
     }
 
     private void initHardware() {

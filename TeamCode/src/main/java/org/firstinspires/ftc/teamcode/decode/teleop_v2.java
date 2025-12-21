@@ -101,6 +101,7 @@ public class teleop_v2 extends LinearOpMode {
             updateTelemetry();
         }
         resetAllServos();
+
     }
 
     private void initHardware() {
