@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.decode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
@@ -11,10 +12,20 @@ import com.qualcomm.robotcore.hardware.Servo;
 @TeleOp(name = "teleop_v5")
 public class teleop_v5 extends LinearOpMode {
 
+    public static double handlerange(double x,double a,double b){
+        if(x>a){
+            return a;
+        }else if(x<b){
+            return b;
+        }else{
+            return x;
+        }
+    }
+
     // === 硬件變量 ===
     NormalizedColorSensor colorSensor1, colorSensor2;
     Servo kickerServo, diskServo, gateServoL, gateServoR;
-    DcMotor intakeMotor, shooterMotor;
+    DcMotor intakeMotor, shooterMotor, baseMotor;
     DcMotor frontLeftMotor, frontRightMotor, backLeftMotor, backRightMotor;
 
     // === 參數設定 ===
@@ -33,8 +44,8 @@ public class teleop_v5 extends LinearOpMode {
     private static final double KICKER_EXTEND = 0.8;
 
     // 時間參數 (ms)
-    private static final int TIME_BALL_SETTLE = 800;
-    private static final int TIME_DISK_MOVE = 500;
+    private static final int TIME_BALL_SETTLE = 200;
+    private static final int TIME_DISK_MOVE = 300;
     private static final int TIME_SHOOTER_SPIN = 1000;
     private static final int TIME_KICK_OUT = 300;
     private static final int TIME_KICK_RETRACT = 250;
@@ -75,6 +86,14 @@ public class teleop_v5 extends LinearOpMode {
     @Override
     public void runOpMode() {
         initHardware();
+        DcMotor baseMotor = hardwareMap.get(DcMotor.class, "motor6");
+        baseMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        baseMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        baseMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        CRServo angleServo = hardwareMap.get(CRServo.class,"servo3");
+        angleServo.setDirection(CRServo.Direction.REVERSE);
+
+
 
         telemetry.addData("Status", "Sequence Updated");
         telemetry.addData("Priority", "C -> B -> A"); // 顯示優先級
@@ -82,10 +101,28 @@ public class teleop_v5 extends LinearOpMode {
         telemetry.update();
 
         waitForStart();
+        int blp = baseMotor.getCurrentPosition();
+        int b_upper_limit = 1895;
+        int b_lower_limit = 0;
+
 
         while (opModeIsActive()) {
 
-            // === 底盤控制 ===
+//            baseMotor.setPower(gamepad1.left_trigger - gamepad1.right_trigger);
+            if (baseMotor.getCurrentPosition() <= b_upper_limit && baseMotor.getCurrentPosition() >= b_lower_limit) {
+                baseMotor.setPower(handlerange(gamepad1.left_trigger - gamepad1.right_trigger,1,-1));
+            } else if (baseMotor.getCurrentPosition() >= b_upper_limit) {
+                baseMotor.setPower(handlerange(gamepad1.left_trigger - gamepad1.right_trigger, 0, -1));
+            } else if (baseMotor.getCurrentPosition() <= b_lower_limit) {
+                baseMotor.setPower(handlerange(gamepad1.left_trigger - gamepad1.right_trigger, 1, 0));
+            }
+            telemetry.addData("motor6 current position",baseMotor.getCurrentPosition());
+
+
+
+
+
+
             double x = gamepad1.left_stick_x;
             double y = -gamepad1.left_stick_y;
             double rx = gamepad1.right_stick_x;
@@ -319,6 +356,8 @@ public class teleop_v5 extends LinearOpMode {
         backLeftMotor = hardwareMap.get(DcMotor.class, "motor2");
         frontRightMotor = hardwareMap.get(DcMotor.class, "motor0");
         backRightMotor = hardwareMap.get(DcMotor.class, "motor3");
+
+
 
         frontLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         backLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);

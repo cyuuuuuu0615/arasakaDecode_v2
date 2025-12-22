@@ -59,13 +59,15 @@ public class teleop extends LinearOpMode {
         Servo fasheServo = hardwareMap.get(Servo.class,"servo1");
         Servo baseServo = hardwareMap.get(Servo.class,"servo2");
         DcMotor shootingMotor = hardwareMap.get(DcMotor.class, "motor5");
+        DcMotor baseMotor = hardwareMap.get(DcMotor.class, "motor6");
         CRServo angleServo = hardwareMap.get(CRServo.class,"servo3");
         Servo zhaServo4 = hardwareMap.get(Servo.class,"servo4");
         Servo zhaServo5 = hardwareMap.get(Servo.class,"servo5");
 
 
 
-
+        baseMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        baseMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
 
         frontLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
@@ -88,10 +90,11 @@ public class teleop extends LinearOpMode {
 
 
 
-//        int dplp = dipanmotor.getCurrentPosition();
 
 
         long startTime = System.currentTimeMillis();
+        int blp = baseMotor.getCurrentPosition();
+
 
 
 
@@ -173,6 +176,17 @@ public class teleop extends LinearOpMode {
 //            }else {
 //                angleServo.setPower(0);
 //            }
+
+
+            if(gamepad1.left_trigger + gamepad1.right_trigger == 0){
+                baseMotor.setTargetPosition(blp);
+                baseMotor.setPower(1);
+                baseMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            }else{
+                blp = baseMotor.getCurrentPosition();
+                baseMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                baseMotor.setPower(0);
+            }
 
 
 

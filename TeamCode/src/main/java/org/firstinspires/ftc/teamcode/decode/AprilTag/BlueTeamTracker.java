@@ -8,7 +8,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Servo;
 
-@TeleOp(name = "Blue Team Tracker", group = "Competition")
+@TeleOp(name = "Blue Team Tracker tag20", group = "Competition")
 public class BlueTeamTracker extends LinearOpMode {
 
     private Limelight3A limelight;
