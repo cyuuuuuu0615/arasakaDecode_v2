@@ -84,9 +84,9 @@ public class testAuto_v3 extends LinearOpMode {
                                 .strafeTo(new Vector2d(80, 0))
                                 .stopAndAdd(new AutoShooterAction(hardwareMap))
 
-                                .strafeTo(new Vector2d(75, 24))
+                                .strafeTo(new Vector2d(73, 24))
                                 .afterTime(0, new AutoIntakeAction(hardwareMap))
-                                .strafeTo(new Vector2d(75, 34), slowVel, slowAccel)
+                                .strafeTo(new Vector2d(73, 34), slowVel, slowAccel)
 
                                 .strafeTo(new Vector2d(80, 0))
                                 .stopAndAdd(new AutoShooterAction(hardwareMap))
@@ -98,7 +98,7 @@ public class testAuto_v3 extends LinearOpMode {
 
                                 .strafeTo(new Vector2d(80, 0))
                                 .stopAndAdd(new AutoShooterAction(hardwareMap))
-                                .strafeTo(new Vector2d(62.5,33))
+                                .strafeTo(new Vector2d(62.5,35))
 
                                 .build()
 
@@ -154,7 +154,7 @@ public class testAuto_v3 extends LinearOpMode {
         private static final double FILL_POS_STEP_2 = 0.3529;
         private static final double FILL_POS_STEP_3 = 0.7137;
         private static final double INTAKE_POWER = 1.0;
-        private static final int TIME_BALL_SETTLE = 100;
+        private static final int TIME_BALL_SETTLE = 200;
         private static final int TIME_DISK_MOVE = 300;
 
         // === 閘門開啟數值 (Updated) ===

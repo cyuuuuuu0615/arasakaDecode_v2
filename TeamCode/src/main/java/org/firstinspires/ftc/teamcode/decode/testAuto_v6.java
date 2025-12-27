@@ -8,14 +8,8 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.SequentialAction;
-import com.acmerobotics.roadrunner.Vector2d;
+import com.acmerobotics.roadrunner.SleepAction;
 import com.acmerobotics.roadrunner.ftc.Actions;
-import com.acmerobotics.roadrunner.VelConstraint;
-import com.acmerobotics.roadrunner.AccelConstraint;
-import com.acmerobotics.roadrunner.MinVelConstraint;
-import com.acmerobotics.roadrunner.TranslationalVelConstraint;
-import com.acmerobotics.roadrunner.AngularVelConstraint;
-import com.acmerobotics.roadrunner.ProfileAccelConstraint;
 
 // Hardware imports
 import com.qualcomm.hardware.limelightvision.Limelight3A;
@@ -29,8 +23,6 @@ import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
-// 引入 Telemetry 以便在手機上顯示
-import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import java.util.Arrays;
@@ -38,14 +30,15 @@ import java.util.List;
 import java.util.ArrayList;
 
 @Config
-@Autonomous(name = "testAuto_v5_DEBUG")
-public class testAuto_v5 extends LinearOpMode {
+@Autonomous(name = "testAuto_v6")
+public class testAuto_v6 extends LinearOpMode {
 
     public enum BallColor {
         PURPLE, GREEN, UNKNOWN, NONE
     }
 
     public static List<BallColor> targetSequence = new ArrayList<>();
+    // 陣列對應: [0]=Hole A (Top), [1]=Hole B (Mid), [2]=Hole C (Bot)
     public static BallColor[] actualBallSlots = {BallColor.NONE, BallColor.NONE, BallColor.NONE};
 
     private Limelight3A limelight;
@@ -59,6 +52,7 @@ public class testAuto_v5 extends LinearOpMode {
         limelight.pipelineSwitch(0);
         limelight.start();
 
+        // 雖然不移動，但還是需要初始化 Drive 避免報錯
         Pose2d beginPose = new Pose2d(0, 0, 0);
         MecanumDrive drive = new MecanumDrive(hardwareMap, beginPose);
 
@@ -76,31 +70,46 @@ public class testAuto_v5 extends LinearOpMode {
         gateServoL.setDirection(Servo.Direction.REVERSE);
         gateServoR.setDirection(Servo.Direction.FORWARD);
 
-        VelConstraint slowVel = new MinVelConstraint(Arrays.asList(
-                new TranslationalVelConstraint(10.0),
-                new AngularVelConstraint(Math.toRadians(90))
-        ));
-        AccelConstraint slowAccel = new ProfileAccelConstraint(-10.0, 10.0);
-
+        // 預設順序
         targetSequence.clear();
         targetSequence.add(BallColor.PURPLE);
         targetSequence.add(BallColor.PURPLE);
         targetSequence.add(BallColor.PURPLE);
 
-        telemetry.addLine("Ready: v5 DEBUG MODE");
-        telemetry.addLine("Wait for Start...");
+        telemetry.addLine("Ready: v6 STATIONARY (Hand Feed Intake -> Shoot)");
         telemetry.update();
 
-        // ... (Init Loop 省略，保持不變) ...
+        // --- 2. Init Loop (Limelight 掃描) ---
         while (opModeInInit()) {
-            // ... 你的 Limelight 代碼 ...
-            telemetry.addData("Status", "In Init Loop");
+            LLResult result = limelight.getLatestResult();
+            int id = -1;
+
+            if (result != null && result.isValid()) {
+                List<LLResultTypes.FiducialResult> tags = result.getFiducialResults();
+                if (!tags.isEmpty()) {
+                    id = (int) tags.get(0).getFiducialId();
+                }
+            }
+
+            if (id == 21) {
+                targetSequence.clear();
+                targetSequence.add(BallColor.GREEN); targetSequence.add(BallColor.PURPLE); targetSequence.add(BallColor.PURPLE);
+                telemetry.addData("Tag", "21 (G-P-P)");
+            } else if (id == 22) {
+                targetSequence.clear();
+                targetSequence.add(BallColor.PURPLE); targetSequence.add(BallColor.GREEN); targetSequence.add(BallColor.PURPLE);
+                telemetry.addData("Tag", "22 (P-G-P)");
+            } else if (id == 23) {
+                targetSequence.clear();
+                targetSequence.add(BallColor.PURPLE); targetSequence.add(BallColor.PURPLE); targetSequence.add(BallColor.GREEN);
+                telemetry.addData("Tag", "23 (P-P-G)");
+            } else {
+                telemetry.addData("Tag", "Scanning... Default (P-P-P)");
+            }
             telemetry.update();
         }
 
         waitForStart();
-//        shooterMotor.setPower(.7);
-
         limelight.stop();
 
         // --- 3. 開始運行 ---
@@ -119,61 +128,51 @@ public class testAuto_v5 extends LinearOpMode {
             return false;
         };
 
-        telemetry.addData("Status", "Actions Started");
-        telemetry.update();
-
-        // --- RoadRunner 動作序列 ---
+        // --- RoadRunner 動作序列 (原地測試版) ---
         Actions.runBlocking(
                 new SequentialAction(
-                        drive.actionBuilder(beginPose)
-                                .afterTime(0, new Motor6Movement(hardwareMap))
+                        // 1. 抬起滑軌 (安全起見)
+                        new Motor6Movement(hardwareMap),
 
-                                // === 第一波 ===
-                                .afterTime(0, startShooterPreHeat)
-//                                .strafeTo(new Vector2d(80, 0)) // [診斷點] 如果機器人卡在這裡，後面的動作都不會執行
+                        // 2. 執行 Intake (手動餵球，直到吸滿3顆)
+                        new AutoIntakeAction(hardwareMap),
 
-                                // 改用傳入 telemetry 的建構子
-                                .stopAndAdd(new SequentialShooterAction(hardwareMap, shooterMotor, angleServo, telemetry))
-//                                .stopAndAdd(stopShooter)
-                                .stopAndAdd(new AutoIntakeAction(hardwareMap,telemetry))
+                        // 3. 吸滿後，稍微停 1 秒
+                        new SleepAction(1.0),
 
-//                                .strafeTo(new Vector2d(75, 23))
-//                                // 改用傳入 telemetry 的建構子
-//                                .afterTime(0, new AutoIntakeAction(hardwareMap, telemetry))
-//                                .strafeTo(new Vector2d(75, 35), slowVel, slowAccel)
+                        // 4. 啟動馬達預熱
+                        startShooterPreHeat,
 
-                                // === 第二波 ===
-//                                .afterTime(0, startShooterPreHeat)
-//                                .strafeTo(new Vector2d(80, -14.5))
-                                // 改用傳入 telemetry 的建構子
-                                .stopAndAdd(new AutoShooterAction(hardwareMap, shooterMotor, angleServo, telemetry))
-                                .stopAndAdd(stopShooter)
-                                .build()
+                        // 5. 執行自動辨色射擊 (根據 Intake 偵測結果)
+                        new AutoShooterAction(hardwareMap, shooterMotor, angleServo),
+
+                        // 6. 結束
+                        stopShooter
                 )
         );
     }
 
     // =========================================================
-    // Action 1: AutoIntakeAction
+    // Action 1: AutoIntakeAction (穩健模式：確認球在洞裡才轉動)
     // =========================================================
     public static class AutoIntakeAction implements Action {
         private final DcMotor intakeMotor;
         private final Servo diskServo, gateServoL, gateServoR;
         private final NormalizedColorSensor colorSensor1, colorSensor2;
-        private final Telemetry telemetry; // 新增 Telemetry
         private boolean initialized = false;
         private long timer = 0;
         private int currentFillStep = 0;
 
-        // ... (保留常數定義) ...
         private static final double FILL_POS_STEP_1 = 0.0;
         private static final double FILL_POS_STEP_2 = 0.3529;
         private static final double FILL_POS_STEP_3 = 0.7137;
         private static final double INTAKE_POWER = 1.0;
-        private static final int TIME_BALL_SETTLE = 500;
+
+        private static final int TIME_BALL_SETTLE = 500; // 等待球停穩
         private static final int TIME_DISK_MOVE = 300;
         private static final double GATE_L_OPEN = 0.6667;
         private static final double GATE_R_OPEN = 0.6902;
+
         private static final float MIN_DETECT_BRIGHTNESS = 0.7f;
         private static final float PURPLE_RATIO_LIMIT = 1.2f;
 
@@ -181,9 +180,7 @@ public class testAuto_v5 extends LinearOpMode {
         private State state = State.IDLE;
         private BallColor tempDetectedColor = BallColor.NONE;
 
-        // 建構子新增 Telemetry
-        public AutoIntakeAction(HardwareMap hardwareMap, Telemetry telemetry) {
-            this.telemetry = telemetry;
+        public AutoIntakeAction(HardwareMap hardwareMap) {
             intakeMotor = hardwareMap.get(DcMotor.class, "motor4");
             diskServo = hardwareMap.get(Servo.class, "servo2");
             gateServoL = hardwareMap.get(Servo.class, "servo4");
@@ -210,54 +207,61 @@ public class testAuto_v5 extends LinearOpMode {
                 diskServo.setPosition(FILL_POS_STEP_1);
                 intakeMotor.setPower(INTAKE_POWER);
                 currentFillStep = 0;
-                Arrays.fill(testAuto_v5.actualBallSlots, BallColor.NONE);
+                Arrays.fill(testAuto_v6.actualBallSlots, BallColor.NONE);
                 initialized = true;
             }
 
             BallColor instantReading = getDualSensorColor();
 
-            // 同時寫入 packet (Dashboard) 和 telemetry (手機)
-            packet.put("Intake State", state);
-            telemetry.addData("Action", "Intake Running");
-            telemetry.addData("Intake State", state);
-            telemetry.addData("Color", instantReading);
-            telemetry.update();
+            packet.put("1. Live Color", instantReading);
+            packet.put("2. State", state);
+            packet.put("3. Fill Step", currentFillStep);
 
             switch (state) {
                 case IDLE:
                     if (currentFillStep >= 3) { state = State.FINISHED; break; }
+
                     if (instantReading != BallColor.NONE) {
                         tempDetectedColor = instantReading;
                         timer = System.currentTimeMillis();
                         state = State.WAIT_SETTLE;
                     }
                     break;
+
                 case WAIT_SETTLE:
+                    packet.put("4. Waiting Check", tempDetectedColor);
+
                     if (System.currentTimeMillis() - timer > TIME_BALL_SETTLE) {
+                        // 二次確認：時間到後，球是否還在？
                         BallColor confirmed = instantReading;
+
                         if (confirmed != BallColor.NONE) {
                             if (currentFillStep < 3) {
                                 if (confirmed == BallColor.UNKNOWN && tempDetectedColor != BallColor.UNKNOWN) {
-                                    testAuto_v5.actualBallSlots[currentFillStep] = tempDetectedColor;
+                                    testAuto_v6.actualBallSlots[currentFillStep] = tempDetectedColor;
                                 } else {
-                                    testAuto_v5.actualBallSlots[currentFillStep] = confirmed;
+                                    testAuto_v6.actualBallSlots[currentFillStep] = confirmed;
                                 }
                             }
                             moveToNextPos();
                             timer = System.currentTimeMillis();
                             state = State.ROTATING;
                         } else {
+                            // 球沒停穩跑掉了，回去重吸
                             state = State.IDLE;
                         }
                     }
                     break;
+
                 case ROTATING:
                     if (System.currentTimeMillis() - timer > TIME_DISK_MOVE) {
                         state = State.IDLE;
                     }
                     break;
+
                 case FINISHED:
                     intakeMotor.setPower(0);
+                    packet.put("Final Slots", Arrays.toString(testAuto_v6.actualBallSlots));
                     return false;
             }
             return true;
@@ -280,6 +284,7 @@ public class testAuto_v5 extends LinearOpMode {
         private BallColor getDetectedColor(NormalizedColorSensor sensor) {
             NormalizedRGBA color = sensor.getNormalizedColors();
             if (color.alpha < MIN_DETECT_BRIGHTNESS) return BallColor.NONE;
+
             if (color.blue > color.green && color.blue > color.red) {
                 if (color.blue > (color.green * PURPLE_RATIO_LIMIT)) return BallColor.PURPLE;
             }
@@ -291,39 +296,38 @@ public class testAuto_v5 extends LinearOpMode {
     }
 
     // =========================================================
-    // Action 2: AutoShooterAction (新增 Telemetry)
+    // Action 2: AutoShooterAction (辨色射擊)
     // =========================================================
     public static class AutoShooterAction implements Action {
         private final Servo diskServo, kickerServo, gateServoL, gateServoR, angleServo;
         private final DcMotor shooterMotor;
-        private final Telemetry telemetry; // 新增
         private boolean initialized = false;
         private long timer = 0;
         private int sequenceIndex = 0;
         private int shotCounter = 0;
         private String currentAimTarget = "";
-        private State state = State.DECIDE;
 
-        // ... (保留常數定義) ...
         private static final double FIRE_POS_A = 0.8196;
         private static final double FIRE_POS_B = 0.0471;
         private static final double FIRE_POS_C = 0.4314;
+
         private static final double SPEED_FIRST = 0.7;
         private static final double ANGLE_FIRST = 0.08;
         private static final double SPEED_FOLLOW = 0.68;
         private static final double ANGLE_FOLLOW = 0.03;
+
         private static final double KICKER_REST = 0.0;
         private static final double KICKER_SHOOT = 0.8;
         private static final double GATE_CLOSED = 0.0;
         private static final double GATE_L_OPEN = 0.6667;
         private static final double GATE_R_OPEN = 0.6902;
-        private enum State { DECIDE, AIMING, KICKING, RETRACTING, STOP }
 
-        // 建構子新增 Telemetry
-        public AutoShooterAction(HardwareMap hardwareMap, DcMotor motor, Servo angleServo, Telemetry telemetry) {
+        private enum State { DECIDE, AIMING, KICKING, RETRACTING, STOP }
+        private State state = State.DECIDE;
+
+        public AutoShooterAction(HardwareMap hardwareMap, DcMotor motor, Servo angleServo) {
             this.shooterMotor = motor;
             this.angleServo = angleServo;
-            this.telemetry = telemetry;
             diskServo = hardwareMap.get(Servo.class, "servo2");
             kickerServo = hardwareMap.get(Servo.class, "servo1");
             gateServoL = hardwareMap.get(Servo.class, "servo4");
@@ -347,21 +351,13 @@ public class testAuto_v5 extends LinearOpMode {
                 initialized = true;
             }
 
-            // 同時更新 Dashboard 和 手機
-            packet.put("Auto State", state);
-            packet.put("Shooter Power", shooterMotor.getPower());
-
-            telemetry.addData("Action", "Auto Shooter");
-            telemetry.addData("State", state);
-            telemetry.addData("Power", shooterMotor.getPower());
-            telemetry.update();
-
             switch (state) {
                 case DECIDE:
-                    if (sequenceIndex >= 3 || sequenceIndex >= testAuto_v5.targetSequence.size()) {
+                    if (sequenceIndex >= 3 || sequenceIndex >= testAuto_v6.targetSequence.size()) {
                         state = State.STOP;
                         break;
                     }
+
                     if (shotCounter == 0) {
                         shooterMotor.setPower(SPEED_FIRST);
                         angleServo.setPosition(ANGLE_FIRST);
@@ -369,7 +365,10 @@ public class testAuto_v5 extends LinearOpMode {
                         shooterMotor.setPower(SPEED_FOLLOW);
                         angleServo.setPosition(ANGLE_FOLLOW);
                     }
-                    BallColor neededColor = testAuto_v5.targetSequence.get(sequenceIndex);
+
+                    BallColor neededColor = testAuto_v6.targetSequence.get(sequenceIndex);
+                    packet.put("Target", neededColor);
+
                     String targetSlot = findStrictSlotForColor(neededColor);
                     if (targetSlot == null) targetSlot = findAnyOccupiedSlot();
                     if (targetSlot == null) {
@@ -377,9 +376,11 @@ public class testAuto_v5 extends LinearOpMode {
                         else if (shotCounter == 1) targetSlot = "B";
                         else targetSlot = "A";
                     }
+
                     setupShot(targetSlot);
                     state = State.AIMING;
                     break;
+
                 case AIMING:
                     if (System.currentTimeMillis() - timer > 500) {
                         kickerServo.setPosition(KICKER_SHOOT);
@@ -387,6 +388,7 @@ public class testAuto_v5 extends LinearOpMode {
                         state = State.KICKING;
                     }
                     break;
+
                 case KICKING:
                     if (System.currentTimeMillis() - timer > 300) {
                         kickerServo.setPosition(KICKER_REST);
@@ -397,17 +399,20 @@ public class testAuto_v5 extends LinearOpMode {
                         state = State.RETRACTING;
                     }
                     break;
+
                 case RETRACTING:
                     if (System.currentTimeMillis() - timer > 250) {
                         state = State.DECIDE;
                     }
                     break;
+
                 case STOP:
                     gateServoL.setPosition(GATE_L_OPEN);
                     gateServoR.setPosition(GATE_R_OPEN);
                     diskServo.setPosition(0.0);
                     return false;
             }
+            packet.put("ShotCount", shotCounter);
             return true;
         }
 
@@ -420,141 +425,31 @@ public class testAuto_v5 extends LinearOpMode {
             diskServo.setPosition(targetPos);
             timer = System.currentTimeMillis();
         }
+
         private String findStrictSlotForColor(BallColor color) {
-            if (testAuto_v5.actualBallSlots[2] == color) return "C";
-            if (testAuto_v5.actualBallSlots[1] == color) return "B";
-            if (testAuto_v5.actualBallSlots[0] == color) return "A";
+            if (testAuto_v6.actualBallSlots[2] == color) return "C";
+            if (testAuto_v6.actualBallSlots[1] == color) return "B";
+            if (testAuto_v6.actualBallSlots[0] == color) return "A";
             return null;
         }
+
         private String findAnyOccupiedSlot() {
-            if (testAuto_v5.actualBallSlots[2] != BallColor.NONE) return "C";
-            if (testAuto_v5.actualBallSlots[1] != BallColor.NONE) return "B";
-            if (testAuto_v5.actualBallSlots[0] != BallColor.NONE) return "A";
+            if (testAuto_v6.actualBallSlots[2] != BallColor.NONE) return "C";
+            if (testAuto_v6.actualBallSlots[1] != BallColor.NONE) return "B";
+            if (testAuto_v6.actualBallSlots[0] != BallColor.NONE) return "A";
             return null;
         }
+
         private void removeBallFromSlot(String slot) {
-            if (slot.equals("A")) testAuto_v5.actualBallSlots[0] = BallColor.NONE;
-            else if (slot.equals("B")) testAuto_v5.actualBallSlots[1] = BallColor.NONE;
-            else if (testAuto_v5.actualBallSlots.length > 2 && slot.equals("C")) testAuto_v5.actualBallSlots[2] = BallColor.NONE;
+            if (slot.equals("A")) testAuto_v6.actualBallSlots[0] = BallColor.NONE;
+            else if (slot.equals("B")) testAuto_v6.actualBallSlots[1] = BallColor.NONE;
+            else if (testAuto_v6.actualBallSlots.length > 2 && slot.equals("C")) testAuto_v6.actualBallSlots[2] = BallColor.NONE;
         }
     }
 
     // =========================================================
-    // Action 3: SequentialShooterAction (新增 Telemetry)
+    // Action 3: Motor6Movement (手臂/滑軌移動)
     // =========================================================
-    public static class SequentialShooterAction implements Action {
-        private final Servo diskServo, kickerServo, gateServoL, gateServoR, angleServo;
-        private final DcMotor shooterMotor;
-        private final Telemetry telemetry; // 新增
-        private boolean initialized = false;
-        private long timer = 0;
-        private int step = 0;
-        private State state = State.PREPARE;
-
-        // ... (保留常數定義) ...
-        private static final double FIRE_POS_A = 0.8196;
-        private static final double FIRE_POS_B = 0.0471;
-        private static final double FIRE_POS_C = 0.4314;
-        private static final double SPEED_FIRST = 0.7;
-        private static final double ANGLE_FIRST = 0.08;
-        private static final double SPEED_FOLLOW = 0.68;
-        private static final double ANGLE_FOLLOW = 0.03;
-        private static final double KICKER_REST = 0.0;
-        private static final double KICKER_SHOOT = 0.8;
-        private static final double GATE_CLOSED = 0.0;
-        private static final double GATE_L_OPEN = 0.6667;
-        private static final double GATE_R_OPEN = 0.6902;
-        private enum State { PREPARE, AIMING, KICKING, RETRACTING, STOP }
-
-        // 建構子新增 Telemetry
-        public SequentialShooterAction(HardwareMap hardwareMap, DcMotor motor, Servo angleServo, Telemetry telemetry) {
-            this.shooterMotor = motor;
-            this.angleServo = angleServo;
-            this.telemetry = telemetry; // 保存 telemetry
-            diskServo = hardwareMap.get(Servo.class, "servo2");
-            kickerServo = hardwareMap.get(Servo.class, "servo1");
-            gateServoL = hardwareMap.get(Servo.class, "servo4");
-            gateServoR = hardwareMap.get(Servo.class, "servo5");
-            gateServoL.setDirection(Servo.Direction.REVERSE);
-            gateServoR.setDirection(Servo.Direction.FORWARD);
-            kickerServo.setPosition(KICKER_REST);
-        }
-
-        @Override
-        public boolean run(@NonNull TelemetryPacket packet) {
-            if (!initialized) {
-                // 初始化時立刻啟動馬達
-                shooterMotor.setPower(SPEED_FIRST);
-                angleServo.setPosition(ANGLE_FIRST);
-                gateServoL.setPosition(GATE_CLOSED);
-                gateServoR.setPosition(GATE_CLOSED);
-                step = 0;
-                state = State.PREPARE;
-                initialized = true;
-            }
-
-            // --- 關鍵修改：同時發送到 Dashboard 和 手機 ---
-            packet.put("Seq Step", step);
-            packet.put("Seq State", state);
-            packet.put("Shooter Power", shooterMotor.getPower());
-
-            telemetry.addData("Action", "Sequential Shooter");
-            telemetry.addData("Step", step);
-            telemetry.addData("State", state);
-            telemetry.addData("Power", shooterMotor.getPower());
-            telemetry.update();
-
-            switch (state) {
-                case PREPARE:
-                    if (step > 2) {
-                        state = State.STOP;
-                        break;
-                    }
-                    double targetPos = 0;
-                    if (step == 0) {
-                        targetPos = FIRE_POS_C;
-                        shooterMotor.setPower(SPEED_FIRST);
-                        angleServo.setPosition(ANGLE_FIRST);
-                    } else {
-                        if (step == 1) targetPos = FIRE_POS_B;
-                        else if (step == 2) targetPos = FIRE_POS_A;
-                        shooterMotor.setPower(SPEED_FOLLOW);
-                        angleServo.setPosition(ANGLE_FOLLOW);
-                    }
-                    diskServo.setPosition(targetPos);
-                    timer = System.currentTimeMillis();
-                    state = State.AIMING;
-                    break;
-                case AIMING:
-                    if (System.currentTimeMillis() - timer > 500) {
-                        kickerServo.setPosition(KICKER_SHOOT);
-                        timer = System.currentTimeMillis();
-                        state = State.KICKING;
-                    }
-                    break;
-                case KICKING:
-                    if (System.currentTimeMillis() - timer > 300) {
-                        kickerServo.setPosition(KICKER_REST);
-                        step++;
-                        timer = System.currentTimeMillis();
-                        state = State.RETRACTING;
-                    }
-                    break;
-                case RETRACTING:
-                    if (System.currentTimeMillis() - timer > 250) {
-                        state = State.PREPARE;
-                    }
-                    break;
-                case STOP:
-                    gateServoL.setPosition(GATE_L_OPEN);
-                    gateServoR.setPosition(GATE_R_OPEN);
-                    diskServo.setPosition(0.0);
-                    return false;
-            }
-            return true;
-        }
-    }
-
     public static class Motor6Movement implements Action {
         private final DcMotor motor6;
         private boolean initialized = false;

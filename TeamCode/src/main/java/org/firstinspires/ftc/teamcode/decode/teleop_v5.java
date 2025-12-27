@@ -9,7 +9,7 @@ import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.Servo;
 
-@TeleOp(name = "teleop_v5")
+@TeleOp(name = "teleop_v5 hui tiao guo holeA")
 public class teleop_v5 extends LinearOpMode {
 
     public static double handlerange(double x,double a,double b){
@@ -44,8 +44,8 @@ public class teleop_v5 extends LinearOpMode {
     private static final double KICKER_EXTEND = 0.8;
 
     // 時間參數 (ms)
-    private static final int TIME_BALL_SETTLE = 200;
-    private static final int TIME_DISK_MOVE = 300;
+    private static final int TIME_BALL_SETTLE = 800;
+    private static final int TIME_DISK_MOVE = 500;
     private static final int TIME_SHOOTER_SPIN = 1000;
     private static final int TIME_KICK_OUT = 300;
     private static final int TIME_KICK_RETRACT = 250;
@@ -83,6 +83,7 @@ public class teleop_v5 extends LinearOpMode {
 
     public enum DetectedColor { PURPLE, GREEN, UNKNOWN }
 
+
     @Override
     public void runOpMode() {
         initHardware();
@@ -90,8 +91,11 @@ public class teleop_v5 extends LinearOpMode {
         baseMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         baseMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         baseMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        CRServo angleServo = hardwareMap.get(CRServo.class,"servo3");
-        angleServo.setDirection(CRServo.Direction.REVERSE);
+        Servo angleServo = hardwareMap.get(Servo.class,"servo3");
+        angleServo.setDirection(Servo.Direction.REVERSE);
+        angleServo.scaleRange(0.0, 0.13);
+        angleServo.setPosition(0);
+
 
 
 
@@ -100,13 +104,56 @@ public class teleop_v5 extends LinearOpMode {
         telemetry.addData("Intake Power", INTAKE_POWER);
         telemetry.update();
 
+        double motorPowerVariable = 0;
+
+        // --- 計時器變數設定 ---
+        // 用來記錄上一次按下按鈕的時間
+        long lastInputTime = 0;
+        // 設定冷卻時間 (毫秒)，這裡設為 200ms (0.2秒)
+        long inputDelay = 200;
+
         waitForStart();
         int blp = baseMotor.getCurrentPosition();
-        int b_upper_limit = 1895;
-        int b_lower_limit = 0;
+        int b_upper_limit = 520;
+        int b_lower_limit = -1514;
+        float a_upper_limit = 0.1314F;
+        int a_lower_limit = 0;
+        motorPowerVariable = 0;
+
 
 
         while (opModeIsActive()) {
+
+            // 獲取當前系統時間
+            long currentTime = System.currentTimeMillis();
+
+            // 1. 檢測手把輸入 (加入時間判斷)
+
+            // 邏輯：如果 (按下了左鍵) 且 (現在時間 - 上次按下的時間 > 延遲時間)
+            if (gamepad1.dpad_left && (currentTime - lastInputTime > inputDelay)) {
+
+                motorPowerVariable = motorPowerVariable + 0.05;
+
+                // 更新 "上次按下時間" 為 "現在時間"
+                lastInputTime = currentTime;
+            }
+            // 邏輯：如果 (按下了右鍵) 且 (冷卻時間已到)
+            else if (gamepad1.dpad_right && (currentTime - lastInputTime > inputDelay)) {
+
+                motorPowerVariable = motorPowerVariable - 0.05;
+
+                // 更新計時器
+                lastInputTime = currentTime;
+            }
+
+            // --- 安全限制 (可選) ---
+            // 為了防止數值超過 1.0 或 低於 -1.0，建議加上這段 (Block 裡沒有，但 Java 建議加)
+            if (motorPowerVariable > 1.0) motorPowerVariable = 1.0;
+            if (motorPowerVariable < -1.0) motorPowerVariable = -1.0;
+
+            // 2. 設定馬達功率
+            shooterMotor.setPower(motorPowerVariable);
+
 
 //            baseMotor.setPower(gamepad1.left_trigger - gamepad1.right_trigger);
             if (baseMotor.getCurrentPosition() <= b_upper_limit && baseMotor.getCurrentPosition() >= b_lower_limit) {
@@ -117,9 +164,29 @@ public class teleop_v5 extends LinearOpMode {
                 baseMotor.setPower(handlerange(gamepad1.left_trigger - gamepad1.right_trigger, 1, 0));
             }
             telemetry.addData("motor6 current position",baseMotor.getCurrentPosition());
+            telemetry.addData("Actual Motor Power", shooterMotor.getPower());
+            telemetry.addData("servo3 position",angleServo.getPosition());
 
 
 
+            if(gamepad1.dpad_up){
+                angleServo.setPosition(1);
+            }
+            if(gamepad1.dpad_down){
+                angleServo.setPosition(0);
+            }
+            if(gamepad1.a){
+                angleServo.setPosition(0.5);
+            }
+//            if(gamepad1.b){
+//                angleServo.setPosition(0.032);
+//            }
+//            if(gamepad1.x){
+//            angleServo.setPosition(0.1);
+//            }
+//            if(gamepad1.y){
+//                angleServo.setPosition(0.08);
+//            }
 
 
 
@@ -156,7 +223,7 @@ public class teleop_v5 extends LinearOpMode {
                     fireState = FireState.PREPARING;
                     fireTimer = System.currentTimeMillis();
                     controlGates(false);
-                    shooterMotor.setPower(0.8);
+//                    shooterMotor.setPower(0.8);
                 }
             }
 
@@ -242,7 +309,7 @@ public class teleop_v5 extends LinearOpMode {
                     // 全部發射完畢，復位
                     fireTimer = System.currentTimeMillis();
                     fireState = FireState.RESETTING;
-                    shooterMotor.setPower(0.0);
+//                    shooterMotor.setPower(0.0);
                     diskServo.setPosition(FILL_POS_STEP_1); // 回到 0.0 準備 Intake
                 }
                 break;
