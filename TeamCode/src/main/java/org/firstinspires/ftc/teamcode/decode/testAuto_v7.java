@@ -1,3 +1,4 @@
+
 package org.firstinspires.ftc.teamcode.decode;
 
 import androidx.annotation.NonNull;
@@ -38,7 +39,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 @Config
-@Autonomous(name = "Auto_redAlliance")
+@Autonomous(name = "Auto_blue")
 public class testAuto_v7 extends LinearOpMode {
 
     public enum BallColor {
@@ -54,6 +55,9 @@ public class testAuto_v7 extends LinearOpMode {
     private Limelight3A limelight;
     private DcMotor shooterMotor;
     private Servo angleServo;
+
+    // 定義全域角度常數
+    private static final double FIXED_SHOOTER_ANGLE = 0.2;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -72,7 +76,8 @@ public class testAuto_v7 extends LinearOpMode {
 
         angleServo = hardwareMap.get(Servo.class, "servo3");
         angleServo.setDirection(Servo.Direction.REVERSE);
-        angleServo.setPosition(0.08);
+        // 初始化時就設定為固定角度
+        angleServo.setPosition(FIXED_SHOOTER_ANGLE);
 
         Servo gateServoL = hardwareMap.get(Servo.class, "servo4");
         Servo gateServoR = hardwareMap.get(Servo.class, "servo5");
@@ -81,10 +86,10 @@ public class testAuto_v7 extends LinearOpMode {
 
 
         VelConstraint slowVel = new MinVelConstraint(Arrays.asList(
-                new TranslationalVelConstraint(10.0),
+                new TranslationalVelConstraint(15.0),
                 new AngularVelConstraint(Math.toRadians(90))
         ));
-        AccelConstraint slowAccel = new ProfileAccelConstraint(-10.0, 10.0);
+        AccelConstraint slowAccel = new ProfileAccelConstraint(-15.0, 15.0);
 
 
         // 預設順序
@@ -93,7 +98,7 @@ public class testAuto_v7 extends LinearOpMode {
         targetSequence.add(BallColor.PURPLE);
         targetSequence.add(BallColor.PURPLE);
 
-        telemetry.addLine("Ready: v7 Fix (Motor Continuous Power)");
+        telemetry.addLine("Ready: v8 (Angle 0.2 | Power 0.7->0.75->0.8)");
         telemetry.update();
 
         // --- 2. Init Loop ---
@@ -127,7 +132,8 @@ public class testAuto_v7 extends LinearOpMode {
         }
 
         waitForStart();
-        angleServo.setPosition(0);
+        // 開始後再次確保角度正確
+        angleServo.setPosition(FIXED_SHOOTER_ANGLE);
         limelight.stop();
 
         // --- 3. 開始運行 ---
@@ -135,9 +141,16 @@ public class testAuto_v7 extends LinearOpMode {
         gateServoR.setPosition(0);
         Arrays.fill(actualBallSlots, BallColor.NONE);
 
-        Action startShooterPreHeat = packet -> {
-            shooterMotor.setPower(0.75);
-//            angleServo.setPosition(0.13);
+        // 預熱 Action：配合第一發的速度設定為 0.7
+        Action startShooterPreHeatAfter = packet -> {
+            shooterMotor.setPower(0.7);
+            angleServo.setPosition(FIXED_SHOOTER_ANGLE);
+            return false;
+        };
+
+        Action startShooterPreHeatFirst = packet -> {
+            shooterMotor.setPower(0.5);
+            angleServo.setPosition(FIXED_SHOOTER_ANGLE);
             return false;
         };
 
@@ -149,91 +162,50 @@ public class testAuto_v7 extends LinearOpMode {
         Actions.runBlocking(
                 new SequentialAction(
                         drive.actionBuilder(beginPose)
-//                                .afterTime(0, new Motor6Movement(hardwareMap))
-//
-//                                .afterTime(0, startShooterPreHeat)
-//                                .strafeTo(new Vector2d(80, 0))
-//
-//
-//                                .stopAndAdd(new SequentialShooterAction(hardwareMap, shooterMotor, angleServo, telemetry))
-//                                .stopAndAdd(stopShooter)
-//
-//                                .strafeTo(new Vector2d(75, 23))
-//                                .afterTime(0, new AutoIntakeAction(hardwareMap, telemetry))
-//                                .strafeTo(new Vector2d(75, 35), slowVel, slowAccel)
-//
-//                                .afterTime(0, startShooterPreHeat)
-//                                .strafeTo(new Vector2d(80, -14.5))
-//                                .stopAndAdd(new AutoShooterAction(hardwareMap,shooterMotor,angleServo,telemetry))
-//                                .stopAndAdd(stopShooter)
-//
-//                                .strafeTo(new Vector2d(50, 22))
-//                                .afterTime(0, new AutoIntakeAction(hardwareMap, telemetry))
-//                                .strafeTo(new Vector2d(50, 34), slowVel, slowAccel)
-//
-//                                .afterTime(0, startShooterPreHeat)
-//                                .strafeTo(new Vector2d(80, -15))
-//                                .stopAndAdd(new AutoShooterAction(hardwareMap,shooterMotor,angleServo,telemetry))
-//                                .stopAndAdd(stopShooter)
-//
-//                                .strafeTo(new Vector2d(25, 22))
-//                                .afterTime(0, new AutoIntakeAction(hardwareMap, telemetry))
-//                                .strafeTo(new Vector2d(25, 34), slowVel, slowAccel)
-//
-//                                .afterTime(0, startShooterPreHeat)
-//                                .strafeTo(new Vector2d(80, -16))
-//                                .stopAndAdd(new AutoShooterAction(hardwareMap,shooterMotor,angleServo,telemetry))
-//                                .stopAndAdd(stopShooter)
-//                                .build()
-
-//------------------------------------------------------------------------------------------------
-
-                                .afterTime(0, new Motor6Movement(hardwareMap))
-
-                                .afterTime(0, startShooterPreHeat)
-                                .strafeTo(new Vector2d(10,0))
-                                .strafeTo(new Vector2d(0,0))
-
-
+                                .afterTime(0, new Motor6GameBig(hardwareMap))
+                                .afterTime(0, startShooterPreHeatFirst)
+                                .strafeTo(new Vector2d(80,0))
 
                                 .stopAndAdd(new SequentialShooterAction(hardwareMap, shooterMotor, angleServo, telemetry))
-                                .stopAndAdd(stopShooter)
-
-                                .strafeTo(new Vector2d(25, 22))
-                                .afterTime(0, new AutoIntakeAction(hardwareMap, telemetry))
-                                .strafeTo(new Vector2d(25, 35), slowVel, slowAccel)
-
-                                .afterTime(0, startShooterPreHeat)
-                                .strafeTo(new Vector2d(0,0))
-                                .stopAndAdd(new AutoShooterAction(hardwareMap,shooterMotor,angleServo,telemetry))
                                 .stopAndAdd(stopShooter)
 
                                 .strafeTo(new Vector2d(50, 22))
                                 .afterTime(0, new AutoIntakeAction(hardwareMap, telemetry))
                                 .strafeTo(new Vector2d(50, 34), slowVel, slowAccel)
 
-                                .afterTime(0, startShooterPreHeat)
+                                .afterTime(0, startShooterPreHeatAfter)
+                                .afterTime(0, new Motor6GameSmall(hardwareMap))
+                                .strafeTo(new Vector2d(50,0))
+                                .strafeTo(new Vector2d(0,-5))
+                                .stopAndAdd(new AutoShooterAction(hardwareMap,shooterMotor,angleServo,telemetry))
+                                .stopAndAdd(stopShooter)
+
+                                .strafeTo(new Vector2d(27, 22))
+                                .afterTime(0, new AutoIntakeAction(hardwareMap, telemetry))
+                                .strafeTo(new Vector2d(27, 34), slowVel, slowAccel)
+
+                                .afterTime(0, startShooterPreHeatAfter)
                                 .strafeTo(new Vector2d(0, 0))
                                 .stopAndAdd(new AutoShooterAction(hardwareMap,shooterMotor,angleServo,telemetry))
                                 .stopAndAdd(stopShooter)
 
                                 .strafeTo(new Vector2d(62.5,40))
-
-//                                .strafeTo(new Vector2d(75, 22))
-//                                .afterTime(0, new AutoIntakeAction(hardwareMap, telemetry))
-//                                .strafeTo(new Vector2d(75, 34), slowVel, slowAccel)
-//
-//                                .afterTime(0, startShooterPreHeat)
-//                                .strafeTo(new Vector2d(0, 0))
-//                                .stopAndAdd(new AutoShooterAction(hardwareMap,shooterMotor,angleServo,telemetry))
-//                                .stopAndAdd(stopShooter)
+                                .afterTime(0, new Motor6GameEnd(hardwareMap))
                                 .build()
                 )
         );
     }
 
     // =========================================================
-    // Action 1: SequentialShooterAction (已修正馬達停止問題)
+    // Action 1: SequentialShooterAction
+    // 修改：固定角度 0.2
+    // 修改速度：第一顆 0.5，第二、三顆 0.55
+    // =========================================================
+    // =========================================================
+    // Action: SequentialShooterAction (原 AutoShooterAction 改名)
+    // 設定：強制發射順序為 C -> B -> A
+    // 速度：0.7 -> 0.75 -> 0.8
+    // 角度：固定 0.2
     // =========================================================
     public static class SequentialShooterAction implements Action {
         private final Servo diskServo, kickerServo, gateServoL, gateServoR, angleServo;
@@ -241,25 +213,33 @@ public class testAuto_v7 extends LinearOpMode {
         private final Telemetry telemetry;
         private boolean initialized = false;
         private long timer = 0;
-        private int step = 0;
-        // 新增：追蹤當前應該有的馬達速度
+        private int sequenceIndex = 0;
+        private int shotCounter = 0;
+        private String currentAimTarget = "";
         private double currentPower = 0.0;
-        private State state = State.PREPARE;
 
         private static final double FIRE_POS_A = 0.8196;
         private static final double FIRE_POS_B = 0.0471;
         private static final double FIRE_POS_C = 0.4314;
-        private static final double SPEED_FIRST = 0.75;
-        private static final double ANGLE_FIRST = 0.13;
-        private static final double SPEED_FOLLOW = 0.8;
-        private static final double ANGLE_FOLLOW = 0.13;
+
+        // 速度常數 (維持 AutoShooter 的高轉速設定)
+        private static final double POWER_1 = 0.65;
+        private static final double POWER_2 = 0.6;
+        private static final double POWER_3 = 0.6;
+
+        // 固定角度常數
+        private static final double FIXED_ANGLE = 0.2;
+
         private static final double KICKER_REST = 0.0;
         private static final double KICKER_SHOOT = 0.8;
         private static final double GATE_CLOSED = 0.0;
         private static final double GATE_L_OPEN = 0.6667;
         private static final double GATE_R_OPEN = 0.6902;
-        private enum State { PREPARE, AIMING, KICKING, RETRACTING, STOP }
 
+        private enum State { DECIDE, AIMING, KICKING, RETRACTING, STOP }
+        private State state = State.DECIDE;
+
+        // 建構子名稱已更改
         public SequentialShooterAction(HardwareMap hardwareMap, DcMotor motor, Servo angleServo, Telemetry telemetry) {
             this.shooterMotor = motor;
             this.angleServo = angleServo;
@@ -276,48 +256,61 @@ public class testAuto_v7 extends LinearOpMode {
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
             if (!initialized) {
-                // 初始化時設定第一段速度
-                currentPower = SPEED_FIRST;
-//                angleServo.setPosition(ANGLE_FIRST);
                 gateServoL.setPosition(GATE_CLOSED);
                 gateServoR.setPosition(GATE_CLOSED);
-                step = 0;
-                state = State.PREPARE;
+
+                // 初始化設定
+                shotCounter = 0;
+                sequenceIndex = 0;
+                currentPower = POWER_1;
+                angleServo.setPosition(FIXED_ANGLE);
+
+                timer = System.currentTimeMillis();
+                state = State.DECIDE;
                 initialized = true;
             }
 
-            // 【關鍵修正】每一圈都重新發送動力指令，防止馬達停止
+            // 持續發送馬達動力
             shooterMotor.setPower(currentPower);
 
-            packet.put("Seq Step", step);
-            packet.put("Seq State", state);
-            packet.put("Shooter Power", currentPower);
-            telemetry.addData("Action", "Sequential Shooter");
-            telemetry.addData("Step", step);
-            telemetry.addData("State", state);
+            packet.put("Seq State", state); // 修改 Telemetry 標籤以符合類別名稱
+            packet.put("CMD Power", currentPower);
+            telemetry.addData("Seq State", state);
             telemetry.addData("CMD Power", currentPower);
             telemetry.update();
 
             switch (state) {
-                case PREPARE:
-                    if (step > 2) { state = State.STOP; break; }
-                    double targetPos = 0;
-                    if (step == 0) {
-                        targetPos = FIRE_POS_C;
-                        currentPower = SPEED_FIRST; // 更新變數
-//                        angleServo.setPosition(ANGLE_FIRST);
-                    } else {
-                        if (step == 1) targetPos = FIRE_POS_B;
-                        else if (step == 2) targetPos = FIRE_POS_A;
-                        currentPower = SPEED_FOLLOW; // 更新變數
-//                        angleServo.setPosition(ANGLE_FOLLOW);
+                case DECIDE:
+                    // 如果射滿 3 發就停止 (不論 targetSequence 長度為何，這裡強制射 3 發)
+                    if (shotCounter >= 3) {
+                        state = State.STOP;
+                        break;
                     }
-                    diskServo.setPosition(targetPos);
-                    timer = System.currentTimeMillis();
+
+                    String bestSlot = "";
+
+                    // --- 速度設定 & 強制順序 C -> B -> A ---
+                    if (shotCounter == 0) {
+                        currentPower = POWER_1; // 0.7
+                        bestSlot = "C";         // 第一發強制 C
+                    } else if (shotCounter == 1) {
+                        currentPower = POWER_2; // 0.75
+                        bestSlot = "B";         // 第二發強制 B
+                    } else {
+                        currentPower = POWER_3; // 0.8
+                        bestSlot = "A";         // 第三發強制 A
+                    }
+
+                    // 確保角度固定
+                    angleServo.setPosition(FIXED_ANGLE);
+
+                    // 執行設定
+                    setupShot(bestSlot);
                     state = State.AIMING;
                     break;
+
                 case AIMING:
-                    if (System.currentTimeMillis() - timer > 500) {
+                    if (System.currentTimeMillis() - timer > 800) {
                         kickerServo.setPosition(KICKER_SHOOT);
                         timer = System.currentTimeMillis();
                         state = State.KICKING;
@@ -326,18 +319,21 @@ public class testAuto_v7 extends LinearOpMode {
                 case KICKING:
                     if (System.currentTimeMillis() - timer > 300) {
                         kickerServo.setPosition(KICKER_REST);
-                        step++;
+                        // 更新庫存狀態
+                        removeBallFromSlot(currentAimTarget);
+                        shotCounter++;
+                        sequenceIndex++; // 雖然不依賴 sequenceIndex 判斷顏色，但保留計數
                         timer = System.currentTimeMillis();
                         state = State.RETRACTING;
                     }
                     break;
                 case RETRACTING:
                     if (System.currentTimeMillis() - timer > 250) {
-                        state = State.PREPARE;
+                        state = State.DECIDE;
                     }
                     break;
                 case STOP:
-                    currentPower = 0; // 停止動力
+                    currentPower = 0;
                     shooterMotor.setPower(0);
                     gateServoL.setPosition(GATE_L_OPEN);
                     gateServoR.setPosition(GATE_R_OPEN);
@@ -346,11 +342,27 @@ public class testAuto_v7 extends LinearOpMode {
             }
             return true;
         }
+
+        private void setupShot(String slot) {
+            currentAimTarget = slot;
+            double targetPos = 0;
+            if (slot.equals("A")) targetPos = FIRE_POS_A;
+            else if (slot.equals("B")) targetPos = FIRE_POS_B;
+            else if (slot.equals("C")) targetPos = FIRE_POS_C;
+            diskServo.setPosition(targetPos);
+            timer = System.currentTimeMillis();
+        }
+
+        // 輔助函式：從記憶體中移除球的紀錄
+        private void removeBallFromSlot(String slot) {
+            if (slot.equals("A")) testAuto_v7.actualBallSlots[0] = BallColor.NONE;
+            else if (slot.equals("B")) testAuto_v7.actualBallSlots[1] = BallColor.NONE;
+            else if (testAuto_v7.actualBallSlots.length > 2 && slot.equals("C")) testAuto_v7.actualBallSlots[2] = BallColor.NONE;
+        }
+
+        // 原本的搜尋邏輯函式已移除或不使用
     }
 
-    // =========================================================
-    // Action 2: AutoIntakeAction (保持不變)
-    // =========================================================
     public static class AutoIntakeAction implements Action {
         private final DcMotor intakeMotor;
         private final Servo diskServo, gateServoL, gateServoR;
@@ -364,7 +376,7 @@ public class testAuto_v7 extends LinearOpMode {
         private static final double FILL_POS_STEP_2 = 0.3529;
         private static final double FILL_POS_STEP_3 = 0.7137;
         private static final double INTAKE_POWER = 1.0;
-        private static final int TIME_BALL_SETTLE = 100;
+        private static final int TIME_BALL_SETTLE = 150;
         private static final int TIME_DISK_MOVE = 250;
         private static final double GATE_L_OPEN = 0.6667;
         private static final double GATE_R_OPEN = 0.6902;
@@ -479,7 +491,8 @@ public class testAuto_v7 extends LinearOpMode {
     }
 
     // =========================================================
-    // Action 3: AutoShooterAction (已修正馬達停止問題)
+    // Action 3: AutoShooterAction
+    // 修改：固定角度 0.2，速度依序 0.7 -> 0.75 -> 0.8
     // =========================================================
     public static class AutoShooterAction implements Action {
         private final Servo diskServo, kickerServo, gateServoL, gateServoR, angleServo;
@@ -490,16 +503,20 @@ public class testAuto_v7 extends LinearOpMode {
         private int sequenceIndex = 0;
         private int shotCounter = 0;
         private String currentAimTarget = "";
-        // 新增：追蹤當前應該有的馬達速度
         private double currentPower = 0.0;
 
         private static final double FIRE_POS_A = 0.8196;
         private static final double FIRE_POS_B = 0.0471;
         private static final double FIRE_POS_C = 0.4314;
-        private static final double SPEED_FIRST = 0.75;
-        private static final double ANGLE_FIRST = 0.13;
-        private static final double SPEED_FOLLOW = 0.8;
-        private static final double ANGLE_FOLLOW = 0.13;
+
+        // 速度常數
+        private static final double POWER_1 = 0.65;
+        private static final double POWER_2 = 0.7;
+        private static final double POWER_3 = 0.75;
+
+        // 固定角度常數
+        private static final double FIXED_ANGLE = 0.2;
+
         private static final double KICKER_REST = 0.0;
         private static final double KICKER_SHOOT = 0.8;
         private static final double GATE_CLOSED = 0.0;
@@ -527,17 +544,19 @@ public class testAuto_v7 extends LinearOpMode {
             if (!initialized) {
                 gateServoL.setPosition(GATE_CLOSED);
                 gateServoR.setPosition(GATE_CLOSED);
-                // 初始動力
-                currentPower = SPEED_FIRST;
-//                angleServo.setPosition(ANGLE_FIRST);
-                timer = System.currentTimeMillis();
-                sequenceIndex = 0;
+
+                // 初始化設定
                 shotCounter = 0;
+                sequenceIndex = 0;
+                currentPower = POWER_1;
+                angleServo.setPosition(FIXED_ANGLE);
+
+                timer = System.currentTimeMillis();
                 state = State.DECIDE;
                 initialized = true;
             }
 
-            // 【關鍵修正】每一圈都重新發送動力指令
+            // 持續發送馬達動力
             shooterMotor.setPower(currentPower);
 
             packet.put("Smart State", state);
@@ -553,19 +572,24 @@ public class testAuto_v7 extends LinearOpMode {
                         break;
                     }
 
+                    // --- 速度設定 ---
                     if (shotCounter == 0) {
-                        currentPower = SPEED_FIRST; // 更新變數
-//                        angleServo.setPosition(ANGLE_FIRST);
+                        currentPower = POWER_1; // 0.7
+                    } else if (shotCounter == 1) {
+                        currentPower = POWER_2; // 0.75
                     } else {
-                        currentPower = SPEED_FOLLOW; // 更新變數
-//                        angleServo.setPosition(ANGLE_FOLLOW);
+                        currentPower = POWER_3; // 0.8
                     }
+
+                    // 確保角度固定
+                    angleServo.setPosition(FIXED_ANGLE);
 
                     BallColor neededColor = testAuto_v7.targetSequence.get(sequenceIndex);
                     String bestSlot = findShortestPathSlotForColor(neededColor);
 
                     if (bestSlot == null) bestSlot = findAnyOccupiedSlot();
                     if (bestSlot == null) {
+                        // 如果沒有球，根據邏輯給一個預設值，避免卡死
                         if (shotCounter == 0) bestSlot = "C";
                         else if (shotCounter == 1) bestSlot = "B";
                         else bestSlot = "A";
@@ -576,7 +600,7 @@ public class testAuto_v7 extends LinearOpMode {
                     break;
 
                 case AIMING:
-                    if (System.currentTimeMillis() - timer > 600) {
+                    if (System.currentTimeMillis() - timer > 800) {
                         kickerServo.setPosition(KICKER_SHOOT);
                         timer = System.currentTimeMillis();
                         state = State.KICKING;
@@ -598,7 +622,7 @@ public class testAuto_v7 extends LinearOpMode {
                     }
                     break;
                 case STOP:
-                    currentPower = 0; // 停止
+                    currentPower = 0;
                     shooterMotor.setPower(0);
                     gateServoL.setPosition(GATE_L_OPEN);
                     gateServoR.setPosition(GATE_R_OPEN);
@@ -655,10 +679,30 @@ public class testAuto_v7 extends LinearOpMode {
     // =========================================================
     // Action 4: Motor6Movement (抬手)
     // =========================================================
-    public static class Motor6Movement implements Action {
+    public static class Motor6GameSmall implements Action {
         private final DcMotor motor6;
         private boolean initialized = false;
-        public Motor6Movement(HardwareMap hardwareMap) {
+        public Motor6GameSmall(HardwareMap hardwareMap) {
+            motor6 = hardwareMap.get(DcMotor.class, "motor6");
+            motor6.setDirection(DcMotorSimple.Direction.REVERSE);
+//            motor6.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        }
+        @Override
+        public boolean run(@NonNull TelemetryPacket packet) {
+            if (!initialized) {
+                motor6.setTargetPosition(-25);
+                motor6.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                motor6.setPower(-1.0);
+                initialized = true;
+            }
+            return false;
+        }
+    }
+
+    public static class Motor6GameBig implements Action {
+        private final DcMotor motor6;
+        private boolean initialized = false;
+        public Motor6GameBig(HardwareMap hardwareMap) {
             motor6 = hardwareMap.get(DcMotor.class, "motor6");
             motor6.setDirection(DcMotorSimple.Direction.REVERSE);
             motor6.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -666,7 +710,28 @@ public class testAuto_v7 extends LinearOpMode {
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
             if (!initialized) {
-                motor6.setTargetPosition(-213);
+                motor6.setTargetPosition(-49);
+                motor6.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                motor6.setPower(-1.0);
+                initialized = true;
+            }
+            return false;
+        }
+    }
+
+
+    public static class Motor6GameEnd implements Action {
+        private final DcMotor motor6;
+        private boolean initialized = false;
+        public Motor6GameEnd(HardwareMap hardwareMap) {
+            motor6 = hardwareMap.get(DcMotor.class, "motor6");
+            motor6.setDirection(DcMotorSimple.Direction.REVERSE);
+//            motor6.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        }
+        @Override
+        public boolean run(@NonNull TelemetryPacket packet) {
+            if (!initialized) {
+                motor6.setTargetPosition(0);
                 motor6.setMode(DcMotor.RunMode.RUN_TO_POSITION);
                 motor6.setPower(1.0);
                 initialized = true;
@@ -674,4 +739,6 @@ public class testAuto_v7 extends LinearOpMode {
             return false;
         }
     }
+
+
 }

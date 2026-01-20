@@ -9,6 +9,7 @@ import com.qualcomm.robotcore.hardware.IMU;
 
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
+import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 
 @Autonomous
 public class ApriltagLimelightTest  extends OpMode {
@@ -22,7 +23,7 @@ public class ApriltagLimelightTest  extends OpMode {
         imu = hardwareMap.get(IMU.class,"imu");
         RevHubOrientationOnRobot revHubOrientationOnRobot = new RevHubOrientationOnRobot(
                 RevHubOrientationOnRobot.LogoFacingDirection.UP,
-                RevHubOrientationOnRobot.UsbFacingDirection.FORWARD);
+                RevHubOrientationOnRobot.UsbFacingDirection.LEFT);
         imu.initialize(new IMU.Parameters(revHubOrientationOnRobot));
     }
 
@@ -41,8 +42,14 @@ public class ApriltagLimelightTest  extends OpMode {
             telemetry.addData("Tx",llResult.getTx());
             telemetry.addData("Ty",llResult.getTy());
             telemetry.addData("Ta",llResult.getTa());
+
             telemetry.addData("BotPose",botPose.toString());
+
             telemetry.addData("Yaw",botPose.getOrientation().getYaw());
+            telemetry.addData("Pitch",botPose.getOrientation().getPitch());
+            telemetry.addData("Roll",botPose.getOrientation().getRoll());
+
+
         }
     }
 }
