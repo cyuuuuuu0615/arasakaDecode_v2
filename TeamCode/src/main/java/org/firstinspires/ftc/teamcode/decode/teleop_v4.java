@@ -45,7 +45,8 @@ public class teleop_v4 extends LinearOpMode {
 
     // 時間參數 (ms)
     private static final int TIME_BALL_SETTLE = 150;
-    private static final int TIME_DISK_MOVE = 350;
+    private static final int TIME_DISK_MOVE_INTAKE = 350;
+    private static final int TIME_DISK_MOVE_SHOOTING = 500;
     private static final int TIME_SHOOTER_SPIN = 1000;
     private static final int TIME_KICK_OUT = 300;
     private static final int TIME_KICK_RETRACT = 250;
@@ -261,7 +262,7 @@ public class teleop_v4 extends LinearOpMode {
                 break;
 
             case ROTATING:
-                if (System.currentTimeMillis() - fillTimer > TIME_DISK_MOVE) {
+                if (System.currentTimeMillis() - fillTimer > TIME_DISK_MOVE_INTAKE) {
                     fillState = FillState.IDLE;
                 }
                 break;
@@ -309,7 +310,7 @@ public class teleop_v4 extends LinearOpMode {
                 break;
 
             case AIMING:
-                if (System.currentTimeMillis() - fireTimer > TIME_DISK_MOVE) {
+                if (System.currentTimeMillis() - fireTimer > TIME_DISK_MOVE_SHOOTING) {
                     kickerServo.setPosition(KICKER_EXTEND);
                     fireTimer = System.currentTimeMillis();
                     fireState = FireState.KICKING;
