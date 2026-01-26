@@ -21,10 +21,10 @@ public class teleop_v6 extends LinearOpMode {
     private final double TARGET_TX = 8.0;
 
     // P 決定追蹤力量
-    private double KP = 0.018;
+    private double KP = 0.016;
 
     // D 決定煞車力量
-    private double KD = 0.025;
+    private double KD = 0.073;
 
     // 限制物理速度
     private final double MAX_POWER = 0.45;
@@ -205,14 +205,12 @@ public class teleop_v6 extends LinearOpMode {
 
             // 角度伺服機控制
             if(gamepad1.dpad_up){
-                angleServo.setPosition(0.2);
+                angleServo.setPosition(0.08);
             }
             if(gamepad1.dpad_down){
-                angleServo.setPosition(0);
+                angleServo.setPosition(0.19);
             }
-            if(gamepad1.a){
-                angleServo.setPosition(0.1);
-            }
+
 
             // 底盤移動邏輯 (Mecanum)
             double x = gamepad1.left_stick_x;
