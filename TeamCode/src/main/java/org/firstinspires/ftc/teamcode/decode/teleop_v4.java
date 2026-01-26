@@ -44,8 +44,8 @@ public class teleop_v4 extends LinearOpMode {
     private static final double KICKER_EXTEND = 0.8;
 
     // 時間參數 (ms)
-    private static final int TIME_BALL_SETTLE = 150;
-    private static final int TIME_DISK_MOVE_INTAKE = 350;
+    private static final int TIME_BALL_SETTLE = 50;
+    private static final int TIME_DISK_MOVE_INTAKE = 250;
     private static final int TIME_DISK_MOVE_SHOOTING = 500;
     private static final int TIME_SHOOTER_SPIN = 1000;
     private static final int TIME_KICK_OUT = 300;
@@ -225,7 +225,11 @@ public class teleop_v4 extends LinearOpMode {
             // === 執行邏輯 ===
             runFiringLogic();
             runFillingLogic();
-            runIntakeLogic();
+            if(gamepad1.y){
+                intakeMotor.setPower(-1);
+            }else{
+                runIntakeLogic();
+            }
 
             updateTelemetry();
         }
@@ -432,7 +436,7 @@ public class teleop_v4 extends LinearOpMode {
         kickerServo.scaleRange(0.0, 0.5);
         gateServoL.setDirection(Servo.Direction.REVERSE);
         gateServoR.setDirection(Servo.Direction.FORWARD);
-        shooterMotorRight.setDirection(DcMotorSimple.Direction.REVERSE);
+        shooterMotorLeft.setDirection(DcMotorSimple.Direction.REVERSE);
         intakeMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         shooterMotorLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
         shooterMotorRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);

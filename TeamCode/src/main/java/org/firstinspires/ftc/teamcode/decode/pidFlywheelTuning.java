@@ -1,14 +1,16 @@
 package org.firstinspires.ftc.teamcode.decode;
 
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 
+@TeleOp(name = "pidFlywheelTuning")
 public class pidFlywheelTuning extends OpMode {
 
-    public DcMotorEx flywheelMotor;
+    public DcMotorEx shooterMotorRight;
 
     public double highVelocity = 1500;
     public double lowVelocity = 900;
@@ -25,11 +27,11 @@ public class pidFlywheelTuning extends OpMode {
 
     @Override
     public void init(){
-        flywheelMotor = hardwareMap.get(DcMotorEx.class,"motor5");
-        flywheelMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        flywheelMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        shooterMotorRight = hardwareMap.get(DcMotorEx.class,"motor7");
+        shooterMotorRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        shooterMotorRight.setDirection(DcMotorSimple.Direction.FORWARD);
         PIDFCoefficients pidfCoefficients = new PIDFCoefficients(P,0,0,F);
-        flywheelMotor.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,pidfCoefficients);
+        shooterMotorRight.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,pidfCoefficients);
         telemetry.addLine("Init complete");
     }
 
@@ -65,11 +67,11 @@ public class pidFlywheelTuning extends OpMode {
 
         //set new PIDF coefficient
         PIDFCoefficients pidfCoefficients = new PIDFCoefficients(P,0,0,F);
-        flywheelMotor.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,pidfCoefficients);
+        shooterMotorRight.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,pidfCoefficients);
 
         //set velocity
-        flywheelMotor.setVelocity(curTargetVelocity);
-        double curVelocity = flywheelMotor.getVelocity();
+        shooterMotorRight.setVelocity(curTargetVelocity);
+        double curVelocity = shooterMotorRight.getVelocity();
         double error = curTargetVelocity - curVelocity;
 
         telemetry.addData("Target Velocity", curTargetVelocity);
