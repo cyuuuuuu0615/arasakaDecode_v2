@@ -6,38 +6,37 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorEx; // Added for PID control
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.NormalizedRGBA;
-import com.qualcomm.robotcore.hardware.PIDFCoefficients; // Added for PID control
+import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
 
-@TeleOp(name = "Teleop_v3_limelight+PID")
+@TeleOp(name = "teleop_v3")
 public class teleop_v3 extends LinearOpMode {
-
-    // === 來自 Program 1 的 PID Tuning 變數 ===
-    public double highVelocity = 1500;
-    public double lowVelocity = 900;
-    double curTargetVelocity = highVelocity;
-    double F = 0;
-    double P = 0;
-    double[] stepSizes = {10.0, 1.0, 0.1, 0.001, 0.0001};
-    int stepIndex = 1;
-
-    // 用於按鍵單次觸發判斷 (模擬 wasPressed)
-    boolean lastY = false, lastX = false, lastB = false;
-    boolean lastDpadLeft = false, lastDpadRight = false, lastDpadUp = false, lastDpadDown = false;
 
     // === Limelight 與 PD 控制參數 (來自 Motor_v4) ===
     private Limelight3A limelight;
+
+    // --- 關鍵參數調整 ---
     private final double TARGET_TX = 8.0;
-    private double KP = 0.018;
-    private double KD = 0.025;
+
+    // P 決定追蹤力量
+    private double KP = 0.016;
+
+    // D 決定煞車力量
+    private double KD = 0.073;
+
+    // 限制物理速度
     private final double MAX_POWER = 0.45;
+
+    // 最小啟動動力
     private final double MIN_POWER = 0.06;
+
     private final double DEADBAND = 1.0;
     private double lastError = 0;
+    // ============================================
 
     public static double handlerange(double x,double a,double b){
         if(x>a){
@@ -52,140 +51,138 @@ public class teleop_v3 extends LinearOpMode {
     // === 硬件變量 ===
     NormalizedColorSensor colorSensor1, colorSensor2;
     Servo kickerServo, diskServo, gateServoL, gateServoR;
-    DcMotor intakeMotor, baseMotor;
+    DcMotor intakeMotor, baseMotor; // 注意: baseMotor 即 motor6
     DcMotor frontLeftMotor, frontRightMotor, backLeftMotor, backRightMotor;
-
-    // 將 Shooter 改為 DcMotorEx 以支援 PIDF 控制
     DcMotorEx shooterMotorLeft, shooterMotorRight;
-
     // === 參數設定 ===
-    private static final double FILL_POS_STEP_1 = 0.0;
-    private static final double FILL_POS_STEP_2 = 0.3529;
-    private static final double FILL_POS_STEP_3 = 0.7137;
+    // 裝球位置 (Filling)
+    private static final double FILL_POS_STEP_1 = 0.0;     // Hole A
+    private static final double FILL_POS_STEP_2 = 0.3529;  // Hole B
+    private static final double FILL_POS_STEP_3 = 0.7137;  // Hole C
+
+    // 發射位置 (Firing)
     private static final double FIRE_POS_HOLE_B = 0.0471;
     private static final double FIRE_POS_HOLE_C = 0.4314;
     private static final double FIRE_POS_HOLE_A = 0.8196;
+
+    // Kicker
     private static final double KICKER_REST = 0.0;
     private static final double KICKER_EXTEND = 0.8;
+
+    // 時間參數 (ms)
     private static final int TIME_BALL_SETTLE = 150;
     private static final int TIME_DISK_MOVE_INTAKE = 350;
-    private static final int TIME_DISK_MOVE_SHOOTING = 500;
+    private static final int TIME_DISK_MOVE_SHOOTING = 600;
     private static final int TIME_SHOOTER_SPIN = 1000;
     private static final int TIME_KICK_OUT = 300;
     private static final int TIME_KICK_RETRACT = 250;
+
+    // 閘門
     private static final double GATE_CLOSED = 0.0;
     private static final double GATE_L_OPEN = 0.6667;
     private static final double GATE_R_OPEN = 0.6902;
+
+    // 傳感器與馬達
     private static final float SENSOR_GAIN = 25.0f;
     private static final float MIN_DETECT_BRIGHTNESS = 0.7f;
     private static final float PURPLE_RATIO_LIMIT = 1.2f;
-    private static final double INTAKE_POWER = 0.6;
 
+    // Intake Power
+    private static final double INTAKE_POWER = 1;
+
+    // === 狀態機定義 ===
     private enum FillState { IDLE, WAIT_SETTLE, ROTATING, FULL }
     private enum FireState { IDLE, PREPARING, DECIDING, AIMING, KICKING, RETRACTING, RESETTING }
 
+    // === 運行時變量 ===
     private FillState fillState = FillState.IDLE;
     private FireState fireState = FireState.IDLE;
+
     private long fillTimer = 0;
     private long fireTimer = 0;
+
     private int currentFillStep = 0;
     private boolean hasBallA = false, hasBallB = false, hasBallC = false;
     private String colorHoleA = "EMPTY", colorHoleB = "EMPTY", colorHoleC = "EMPTY";
+
     private double targetFirePos = 0;
     private String currentTargetHole = "";
 
     public enum DetectedColor { PURPLE, GREEN, UNKNOWN }
 
+    double[] stepSizes = {10.0, 1.0, 0.1, 0.001, 0.0001};
+
+    int stepIndex = 1;
+
+    private double targetVelocity = 0;
+
+
+
     @Override
     public void runOpMode() {
+        // 硬體初始化整合到 initHardware 方法中
         initHardware();
+
 
         Servo angleServo = hardwareMap.get(Servo.class,"servo3");
         angleServo.setDirection(Servo.Direction.REVERSE);
 
+        // 啟動 Limelight
         limelight.pipelineSwitch(0);
         limelight.start();
 
-        telemetry.addData("Status", "Limelight Tracking & PID Initialized");
+        telemetry.addData("Status", "Limelight Tracking Initialized");
+        telemetry.addData("Priority", "C -> B -> A");
         telemetry.update();
-        curTargetVelocity = 100;
+
+        angleServo.setPosition(0);
+
+
+        // --- 計時器變數設定 ---
+        long lastInputTime = 0;
+        long inputDelay = 200;
 
         waitForStart();
 
+        // 這些變數在自動追蹤模式下可能暫時用不到，但保留變數定義
+        int blp = baseMotor.getCurrentPosition();
+
         while (opModeIsActive()) {
 
-            // =======================================================
-            // === Program 1 邏輯整合: PID Tuning 與 Velocity 控制 ===
-            // =======================================================
+            long currentTime = System.currentTimeMillis();
 
-            // 按鍵狀態檢測 (模擬 WasPressed)
-            boolean currY = gamepad1.y;
-            boolean currX = gamepad1.x;
-            boolean currB = gamepad1.b;
-            boolean currDpadLeft = gamepad1.dpad_left;
-            boolean currDpadRight = gamepad1.dpad_right;
-            boolean currDpadUp = gamepad1.dpad_up;
-            boolean currDpadDown = gamepad1.dpad_down;
 
-            // 切換速度目標 (Y)
-//            if(currY && !lastY){
-//                if(curTargetVelocity == highVelocity){
-//                    curTargetVelocity = lowVelocity;
-//                }else{
-//                    curTargetVelocity = highVelocity;
-//                }
-//            }
 
-            if(currX && !lastX){
-                curTargetVelocity += 100;
+
+            // 1. 發射輪速度控制 (D-pad Left/Right 增減 100)
+            if (gamepad1.dpad_left && (currentTime - lastInputTime > inputDelay)) {
+                targetVelocity += 100;
+                lastInputTime = currentTime;
             }
-            if(currY && !lastY){
-                curTargetVelocity -= 100;
+            else if (gamepad1.dpad_right && (currentTime - lastInputTime > inputDelay)) {
+                targetVelocity -= 100;
+                lastInputTime = currentTime;
             }
 
-            // 切換微調步長 (B)
-            if(currB && !lastB){
-                stepIndex = (stepIndex+1) % stepSizes.length;
-            }
+            // 速度限制
+            targetVelocity = Math.max(0, Math.min(2800, targetVelocity));
 
-            // 調整 F (D-pad Left/Right)
-            if(currDpadLeft && !lastDpadLeft){
-                F -= stepSizes[stepIndex];
-            }
-            if(currDpadRight && !lastDpadRight){
-                F += stepSizes[stepIndex];
-            }
+            // --- 主從控制核心邏輯 ---
+            // Motor 7 (主) 執行 PIDF 速度閉環
+            shooterMotorRight.setVelocity(targetVelocity);
 
-            // 調整 P (D-pad Up/Down)
-            if(currDpadUp && !lastDpadUp){
-                P += stepSizes[stepIndex];
-            }
-            if(currDpadDown && !lastDpadDown){
-                P -= stepSizes[stepIndex];
-            }
+            // Motor 5 (從) 直接抓取 Motor 7 當下的 Power 輸出
+            double currentPowerFrom7 = shooterMotorRight.getPower();
+            shooterMotorLeft.setPower(currentPowerFrom7);
 
-            // 更新按鍵狀態
-            lastY = currY;
-            lastB = currB;
-            lastDpadLeft = currDpadLeft;
-            lastDpadRight = currDpadRight;
-            lastDpadUp = currDpadUp;
-            lastDpadDown = currDpadDown;
+            telemetry.addData("Target Velocity", targetVelocity);
+            telemetry.addData("Master Vel (M7)", "%.1f", shooterMotorRight.getVelocity());
+            telemetry.addData("Slave Vel (M5)", "%.1f", shooterMotorLeft.getVelocity());
+            telemetry.addData("Current Power Output", "%.3f", shooterMotorRight.getPower());
 
-            // 設定新的 PIDF 係數 (只對 Right 設定，因為 Left 沒有 Encoder 回授)
-            PIDFCoefficients pidfCoefficients = new PIDFCoefficients(P,0,0,F);
-            shooterMotorRight.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidfCoefficients);
-
-            // 設定速度 (主動輪 Right)
-            shooterMotorRight.setVelocity(curTargetVelocity);
-
-            // === 關鍵整合: 獲取 Right 的實際動力並應用到 Left ===
-            // 這樣 Left 會跟隨 PID 計算出的 Power，但不需要自己的 Encoder
-            double appliedPower = shooterMotorRight.getPower();
-            shooterMotorLeft.setPower(appliedPower);
 
             // =======================================================
-            // === Program 2 邏輯: Limelight 自動追蹤 ===
+            // === Motor6 (baseMotor) 自動追蹤邏輯 (取代原本的手動控制) ===
             // =======================================================
 
             LLResult result = limelight.getLatestResult();
@@ -193,37 +190,48 @@ public class teleop_v3 extends LinearOpMode {
             if (result != null && result.isValid()) {
                 double tx = result.getTx();
                 double error = tx - TARGET_TX;
+
+                // 計算 D 項
                 double errorChange = error - lastError;
                 double dTerm = errorChange * KD;
 
                 if (Math.abs(error) > DEADBAND) {
+                    // PD 控制公式
                     double power = (error * KP) + dTerm;
+
+                    // 加上最小動力補償
                     if (error > 0) power += MIN_POWER;
                     else power -= MIN_POWER;
+
+                    // 最終限制
                     power = Math.max(-MAX_POWER, Math.min(MAX_POWER, power));
                     baseMotor.setPower(power);
                 } else {
                     baseMotor.setPower(0);
                 }
-                lastError = error;
+
+                lastError = error; // 更新上一次誤差
+                telemetry.addData("Limelight", "Tracking | tx: %.2f", tx);
             } else {
+                // 失去目標時停止
                 baseMotor.setPower(0);
                 lastError = 0;
+                telemetry.addData("Limelight", "LOST - Searching");
             }
 
             // =======================================================
-            // === Program 2 邏輯: 伺服機與底盤控制 ===
-            // =======================================================
 
+            telemetry.addData("motor6 Power", baseMotor.getPower());
+            telemetry.addData("servo3 position", angleServo.getPosition());
+
+            // 角度伺服機控制
             if(gamepad1.dpad_up){
-                angleServo.setPosition(0.2);
+                angleServo.setPosition(0.1);
             }
             if(gamepad1.dpad_down){
                 angleServo.setPosition(0);
             }
-            if(gamepad1.a){
-                angleServo.setPosition(0.1);
-            }
+
 
             // 底盤移動邏輯 (Mecanum)
             double x = gamepad1.left_stick_x;
@@ -265,7 +273,7 @@ public class teleop_v3 extends LinearOpMode {
             // === 執行邏輯 ===
             runFiringLogic();
             runFillingLogic();
-            if(gamepad1.y){ // 注意：這裡 Y 鍵同時也會觸發上面的速度切換
+            if(gamepad1.y){
                 intakeMotor.setPower(-1);
             }else{
                 runIntakeLogic();
@@ -274,12 +282,13 @@ public class teleop_v3 extends LinearOpMode {
             updateTelemetry();
         }
 
-        limelight.stop();
+        limelight.stop(); // 結束時關閉 Limelight
     }
 
     // === 裝球邏輯 (保持不變) ===
     private void runFillingLogic() {
         if (fireState != FireState.IDLE) return;
+
         if (currentFillStep >= 3) {
             fillState = FillState.FULL;
             return;
@@ -296,6 +305,7 @@ public class teleop_v3 extends LinearOpMode {
                     fillState = FillState.WAIT_SETTLE;
                 }
                 break;
+
             case WAIT_SETTLE:
                 if (System.currentTimeMillis() - fillTimer > TIME_BALL_SETTLE) {
                     moveToNextFillPosition();
@@ -303,11 +313,13 @@ public class teleop_v3 extends LinearOpMode {
                     fillState = FillState.ROTATING;
                 }
                 break;
+
             case ROTATING:
                 if (System.currentTimeMillis() - fillTimer > TIME_DISK_MOVE_INTAKE) {
                     fillState = FillState.IDLE;
                 }
                 break;
+
             case FULL: break;
         }
     }
@@ -317,9 +329,9 @@ public class teleop_v3 extends LinearOpMode {
         switch (fireState) {
             case IDLE: break;
             case PREPARING:
-                // 在此狀態下，PID 控制已經在主循環中讓馬達旋轉，這裡只需等待
                 if (System.currentTimeMillis() - fireTimer > TIME_SHOOTER_SPIN) fireState = FireState.DECIDING;
                 break;
+
             case DECIDING:
                 if (hasBallC) {
                     targetFirePos = FIRE_POS_HOLE_C;
@@ -342,6 +354,7 @@ public class teleop_v3 extends LinearOpMode {
                     diskServo.setPosition(FILL_POS_STEP_1);
                 }
                 break;
+
             case AIMING:
                 if (System.currentTimeMillis() - fireTimer > TIME_DISK_MOVE_SHOOTING) {
                     kickerServo.setPosition(KICKER_EXTEND);
@@ -384,6 +397,7 @@ public class teleop_v3 extends LinearOpMode {
         }
     }
 
+    // === 輔助方法 ===
     private void recordBallColor(DetectedColor color) {
         switch (currentFillStep) {
             case 0: colorHoleA = color.toString(); hasBallA = true; break;
@@ -431,7 +445,10 @@ public class teleop_v3 extends LinearOpMode {
     }
 
     private void initHardware() {
+        // Limelight 初始化
         limelight = hardwareMap.get(Limelight3A.class, "limelight");
+
+        // 傳感器與其他馬達初始化
         colorSensor1 = hardwareMap.get(NormalizedColorSensor.class, "colorSensor1");
         colorSensor2 = hardwareMap.get(NormalizedColorSensor.class, "colorSensor2");
 
@@ -447,20 +464,37 @@ public class teleop_v3 extends LinearOpMode {
 
         intakeMotor = hardwareMap.get(DcMotor.class, "motor4");
 
-        // === Shooter Motor 初始化 (DcMotorEx) ===
+        PIDFCoefficients pidf = new PIDFCoefficients(92, 0, 0, 15);
         shooterMotorLeft = hardwareMap.get(DcMotorEx.class, "motor5");
         shooterMotorRight = hardwareMap.get(DcMotorEx.class, "motor7");
+
+        shooterMotorRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        shooterMotorRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        shooterMotorRight.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidf);
+
+        shooterMotorRight.setDirection(DcMotorSimple.Direction.FORWARD);
+        shooterMotorRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+
+        // Motor 5 (Slave) - 接收 M7 的 Power，所以使用 RUN_WITHOUT_ENCODER
+        shooterMotorLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        shooterMotorLeft.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        shooterMotorLeft.setDirection(DcMotorSimple.Direction.REVERSE);
+        shooterMotorLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+
+
 
         frontLeftMotor = hardwareMap.get(DcMotor.class, "motor1");
         backLeftMotor = hardwareMap.get(DcMotor.class, "motor2");
         frontRightMotor = hardwareMap.get(DcMotor.class, "motor0");
         backRightMotor = hardwareMap.get(DcMotor.class, "motor3");
-        baseMotor = hardwareMap.get(DcMotor.class, "motor6");
 
+        // === Motor6 / BaseMotor 初始化調整 ===
+        baseMotor = hardwareMap.get(DcMotor.class, "motor6");
         baseMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        // 原本使用 RUN_USING_ENCODER，但 PD 控制通常使用 RUN_WITHOUT_ENCODER 以獲得即時響應
         baseMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         baseMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        baseMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        baseMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE); // 保持鎖死
 
         frontLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         backLeftMotor.setDirection(DcMotorSimple.Direction.REVERSE);
@@ -472,23 +506,11 @@ public class teleop_v3 extends LinearOpMode {
         kickerServo.scaleRange(0.0, 0.5);
         gateServoL.setDirection(Servo.Direction.REVERSE);
         gateServoR.setDirection(Servo.Direction.FORWARD);
-
-        // === Shooter Motor 方向與模式設定 ===
-        // 假設 Left 需要反轉以配合 Right (物理上對置)
         shooterMotorLeft.setDirection(DcMotorSimple.Direction.REVERSE);
-        shooterMotorRight.setDirection(DcMotorSimple.Direction.FORWARD);
-
+        intakeMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         intakeMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         shooterMotorLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
         shooterMotorRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
-
-        // === PIDF 初始化設定 (只針對 Right) ===
-        shooterMotorRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        PIDFCoefficients pidfCoefficients = new PIDFCoefficients(P,0,0,F);
-        shooterMotorRight.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, pidfCoefficients);
-
-        // Left 設為不使用 Encoder，單純接收 Power 指令
-        shooterMotorLeft.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
         kickerServo.setPosition(KICKER_REST);
         diskServo.setPosition(FILL_POS_STEP_1);
@@ -500,17 +522,6 @@ public class teleop_v3 extends LinearOpMode {
     }
 
     private void updateTelemetry() {
-        telemetry.addLine("=== PID TUNING ===");
-        double curVelocity = shooterMotorRight.getVelocity();
-        double error = curTargetVelocity - curVelocity;
-        telemetry.addData("Target V", curTargetVelocity);
-        telemetry.addData("Current V", "%.2f", curVelocity);
-        telemetry.addData("Error", "%.2f", error);
-        telemetry.addData("P (D-Pad U/D)", "%.4f", P);
-        telemetry.addData("F (D-Pad L/R)", "%.4f", F);
-        telemetry.addData("Step (B Btn)", "%.4f", stepSizes[stepIndex]);
-        telemetry.addLine("------------------------------------");
-
         telemetry.addLine("=== SYSTEM STATUS ===");
         telemetry.addData("Fill State", fillState);
         telemetry.addData("Fire State", fireState);

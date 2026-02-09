@@ -11,7 +11,7 @@ import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.Servo;
 
-@TeleOp(name = "A Teleop_v6_AutoAim")
+@TeleOp(name = "Teleop_v6_AutoAim")
 public class teleop_v6 extends LinearOpMode {
 
     // === Limelight 與 PD 控制參數 (來自 Motor_v4) ===
@@ -115,7 +115,7 @@ public class teleop_v6 extends LinearOpMode {
         initHardware();
 
         Servo angleServo = hardwareMap.get(Servo.class,"servo3");
-        angleServo.setDirection(Servo.Direction.FORWARD);
+        angleServo.setDirection(Servo.Direction.REVERSE);
 
         // 啟動 Limelight
         limelight.pipelineSwitch(0);
@@ -130,6 +130,8 @@ public class teleop_v6 extends LinearOpMode {
         // --- 計時器變數設定 ---
         long lastInputTime = 0;
         long inputDelay = 200;
+
+        angleServo.setPosition(0);
 
         waitForStart();
 
@@ -205,10 +207,10 @@ public class teleop_v6 extends LinearOpMode {
 
             // 角度伺服機控制
             if(gamepad1.dpad_up){
-                angleServo.setPosition(0.08);
+                angleServo.setPosition(0.12);
             }
             if(gamepad1.dpad_down){
-                angleServo.setPosition(0.19);
+                angleServo.setPosition(0);
             }
 
 
