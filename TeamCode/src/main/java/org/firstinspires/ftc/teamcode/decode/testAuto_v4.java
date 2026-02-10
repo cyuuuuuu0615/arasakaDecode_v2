@@ -37,7 +37,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 @Config
-@Autonomous(name = "AUTO NOW BULE")
+@Autonomous(name = "testAuto_v4")
 public class testAuto_v4 extends LinearOpMode {
 
     // === 1. 全域狀態變數 ===
@@ -63,7 +63,7 @@ public class testAuto_v4 extends LinearOpMode {
 
     // === [後場] 修正參數 ===
     public static double BACK_SHOT_RPM_BOOST = 320.0;
-    public static double BACK_SHOT_TX_OFFSET = 2.5;
+    public static double BACK_SHOT_TX_OFFSET = 2.8;
 
     // === [來自 Teleop] PIDF & 參數 ===
     public static final PIDFCoefficients SHOOTER_PIDF = new PIDFCoefficients(92, 0, 0, 15);
@@ -108,10 +108,10 @@ public class testAuto_v4 extends LinearOpMode {
 
         // 速度限制
         VelConstraint slowVel = new MinVelConstraint(Arrays.asList(
-                new TranslationalVelConstraint(10),
+                new TranslationalVelConstraint(9.6),
                 new AngularVelConstraint(Math.toRadians(90))
         ));
-        AccelConstraint slowAccel = new ProfileAccelConstraint(-10, 10);
+        AccelConstraint slowAccel = new ProfileAccelConstraint(-9.6, 9.6);
 
         robot.limelight.pipelineSwitch(0);
         robot.limelight.start();
@@ -147,9 +147,9 @@ public class testAuto_v4 extends LinearOpMode {
         // Start: 確保 Angle Servo 歸位
         robot.angleServo.setPosition(ANGLE_CLOSE);
 
-        // [修改] 移除 Servo 4/5 歸位
-        // robot.gateServoL.setPosition(0);
-        // robot.gateServoR.setPosition(0);
+//         [修改] 移除 Servo 4/5 歸位
+         robot.gateServoL.setPosition(0);
+         robot.gateServoR.setPosition(0);
 
         // [修改] 一開始就啟動 Intake 並且不再關閉
         robot.intakeMotor.setPower(1.0);
@@ -176,8 +176,8 @@ public class testAuto_v4 extends LinearOpMode {
 
         // [修改] 讓這個 Action 變成空執行
         Action closeGate = packet -> {
-            // robot.gateServoL.setPosition(0); // 移除
-            // robot.gateServoR.setPosition(0); // 移除
+             robot.gateServoL.setPosition(0); // 移除
+             robot.gateServoR.setPosition(0); // 移除
             return false;
         };
 
@@ -211,27 +211,24 @@ public class testAuto_v4 extends LinearOpMode {
                                         .strafeTo(new Vector2d(-76, -36), slowVel, slowAccel)
 
                                         // 這裡原本會關閉 Intake，現在 cmdStopIntake 是空的，Intake 會繼續轉
-                                        .stopAndAdd(cmdStopIntake)
+                                        .afterTime(0, cmdTurretBig)
+                                        .afterTime(0, cmdStartPreheat)
+                                        .strafeTo(new Vector2d(-80,0))
                                         .stopAndAdd(cmdTurretTrack)
-                                        .strafeTo(new Vector2d(-76,0))
 
-                                        // --- 第三階段：後場射擊 (Back Shot) ---
-                                        .strafeTo(new Vector2d(0, 0))
-
-                                        .waitSeconds(0.6)
-                                        // 這裡原本會關 Gate，現在 closeGate 是空的
+                                        .waitSeconds(0.2)
                                         .stopAndAdd(closeGate)
-                                        .stopAndAdd(new BackShooterAction(robot, telemetry))
+                                        .stopAndAdd(new FrontShooterAction(robot, telemetry))
                                         .stopAndAdd(cmdStopPreheat)
                                         //-------------------------------------------------------------------------------
-                                        .strafeTo(new Vector2d(-24, -14))
+                                        .strafeTo(new Vector2d(-24.5, -14))
                                         .afterTime(0, cmdStartPreheat)
 
                                         .afterTime(0, new AutoIntakeAction(robot, telemetry))
 
                                         .afterTime(0, cmdTurretSmall)
 
-                                        .strafeTo(new Vector2d(-24, -36), slowVel, slowAccel)
+                                        .strafeTo(new Vector2d(-24.5, -36), slowVel, slowAccel)
 
                                         .stopAndAdd(cmdStopIntake) // 空的
                                         .stopAndAdd(cmdTurretSmall)
@@ -433,8 +430,8 @@ public class testAuto_v4 extends LinearOpMode {
         private static final double FILL_POS_1 = 0.0;
         private static final double FILL_POS_2 = 0.3529;
         private static final double FILL_POS_3 = 0.7137;
-        private static final long TIME_BALL_SETTLE = 50;
-        private static final long TIME_DISK_MOVE = 100;
+        private static final long TIME_BALL_SETTLE = 30;
+        private static final long TIME_DISK_MOVE = 60;
         private static final float MIN_DETECT_BRIGHTNESS = 0.7f;
         private static final float PURPLE_RATIO_LIMIT = 1.2f;
 
@@ -447,8 +444,8 @@ public class testAuto_v4 extends LinearOpMode {
         public boolean run(@NonNull TelemetryPacket packet) {
             if (!initialized) {
                 // [修改] 移除 Servo 4/5 設置
-                // robot.gateServoL.setPosition(0.6667);
-                // robot.gateServoR.setPosition(0.6902);
+                 robot.gateServoL.setPosition(0.6667);
+                 robot.gateServoR.setPosition(0.6902);
 
                 robot.diskServo.setPosition(FILL_POS_1);
                 // 這裡保留 setPower(1.0) 確保如果意外停了還會開，但理論上前面已經開了

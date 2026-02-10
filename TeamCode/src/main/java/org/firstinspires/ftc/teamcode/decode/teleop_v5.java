@@ -14,7 +14,7 @@ import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
 
 // [修改] 名稱改為 RED
-@TeleOp(name = "teleop RED v3 (Jam Fix)")
+@TeleOp(name = "teleop_v5")
 public class teleop_v5 extends LinearOpMode {
 
     // === Limelight 與 PD 控制參數 ===

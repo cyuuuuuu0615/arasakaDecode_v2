@@ -13,7 +13,7 @@ import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
 
-@TeleOp(name = "teleop BULE")
+@TeleOp(name = "teleop_v2")
 public class teleop_v2 extends LinearOpMode {
 
     // === Limelight 與 PD 控制參數 ===
@@ -40,10 +40,9 @@ public class teleop_v2 extends LinearOpMode {
     // --- RPM 參數 ---
     private static final double RPM_SLOPE_CLOSE = 11.0;
     private static final double RPM_BASE_CLOSE = 610.0;
-    private static final double RPM_SLOPE_FAR = 10.0;
-    private static final double RPM_BASE_FAR = 620.0;
+    private static final double RPM_SLOPE_FAR = 11.0;  // 原 10.0 -> 11.0 (距離加成更強)
+    private static final double RPM_BASE_FAR = 680.0;  // 原 620.0 -> 680.0 (基礎轉速+60)
     private static final double RPM_IDLE = 300.0;
-
     // === [新增] 緩降邏輯變數 ===
     // 記錄當前發送給馬達的指令速度
     private double currentCommandedRpm = RPM_IDLE;

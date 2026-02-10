@@ -13,12 +13,12 @@ import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
 
-@TeleOp(name = "teleop BULE v3 (Jam Fix)")
+@TeleOp(name = "A RED Teleop")
 public class teleop_v4 extends LinearOpMode {
 
-    // === Limelight 與 PD 控制參數 ===
     private Limelight3A limelight;
-    private final double TARGET_TX = 6.0;
+
+    private final double TARGET_TX = -6.0;
 
     private final double MIN_POWER = 0.06;
     private double lastError = 0;
@@ -27,9 +27,7 @@ public class teleop_v4 extends LinearOpMode {
     private final double MAX_POWER = 0.40;
     private final double DEADBAND = 1.5;
 
-    // ==========================================
-    // === 距離與速度計算參數 ===
-    // ==========================================
+
     private static final double CAMERA_HEIGHT = 14.5;
     private static final double TARGET_HEIGHT = 39.0;
     private static final double MOUNT_ANGLE = 17.8;
@@ -37,18 +35,16 @@ public class teleop_v4 extends LinearOpMode {
     private static final double ANGLE_CLOSE = 0.0;
     private static final double ANGLE_FAR = 0.12;
 
-    // --- RPM 參數 ---
     private static final double RPM_SLOPE_CLOSE = 11.0;
     private static final double RPM_BASE_CLOSE = 610.0;
-    private static final double RPM_SLOPE_FAR = 10.0;
-    private static final double RPM_BASE_FAR = 620.0;
+    private static final double RPM_SLOPE_FAR = 11.0;
+    private static final double RPM_BASE_FAR = 680.0;
     private static final double RPM_IDLE = 300.0;
 
-    // === 緩降邏輯變數 ===
     private double currentCommandedRpm = RPM_IDLE;
     private static final double RPM_RAMP_DOWN_STEP = 5.0;
 
-    // === 硬件變量 ===
+
     NormalizedColorSensor colorSensor1, colorSensor2;
     Servo kickerServo, diskServo, gateServoL, gateServoR, angleServo;
     DcMotor intakeMotor, baseMotor;
@@ -58,7 +54,6 @@ public class teleop_v4 extends LinearOpMode {
 
     public static final PIDFCoefficients SHOOTER_PIDF = new PIDFCoefficients(92, 0, 0, 15);
 
-    // === 其他常數 ===
     private static final double FILL_POS_STEP_1 = 0.0;    // Hole A
     private static final double FILL_POS_STEP_2 = 0.3529; // Hole B
     private static final double FILL_POS_STEP_3 = 0.7137; // Hole C
@@ -70,7 +65,6 @@ public class teleop_v4 extends LinearOpMode {
     private static final double KICKER_REST = 0.0;
     private static final double KICKER_EXTEND = 0.8;
 
-    // 時間參數
     private static final int TIME_BALL_SETTLE = 170;
     private static final int TIME_DISK_MOVE_INTAKE = 350;
     private static final int TIME_DISK_MOVE_SHOOTING = 600;
@@ -103,8 +97,6 @@ public class teleop_v4 extends LinearOpMode {
     private double desiredTargetRpm = 0;
     private boolean isHighSpeedMode = false;
     private boolean lastRightBumper = false;
-
-    // [新增] 用於按鈕 A 的防手抖變數
     private boolean lastButtonA = false;
 
     @Override
@@ -121,7 +113,7 @@ public class teleop_v4 extends LinearOpMode {
         angleServo.setDirection(Servo.Direction.REVERSE);
         angleServo.setPosition(ANGLE_CLOSE);
 
-        telemetry.addData("Status", "Ready (Press A to unjam/rollback)");
+        telemetry.addData("Status", "Ready (RED ALLIANCE)");
         telemetry.update();
 
         long lastInputTime = 0;
@@ -139,11 +131,10 @@ public class teleop_v4 extends LinearOpMode {
                 if (result != null && result.isValid()) targetValid = true;
             } catch (Exception e) { targetValid = false; }
 
-            // =======================================================
-            // 1. BaseMotor (砲塔) 自動控制
-            // =======================================================
+
             if (targetValid) {
                 double tx = result.getTx();
+                // 使用修改後的 TARGET_TX (-6.0)
                 double error = tx - TARGET_TX;
                 double errorChange = error - lastError;
                 double dTerm = errorChange * KD;
@@ -163,9 +154,7 @@ public class teleop_v4 extends LinearOpMode {
                 lastError = 0;
             }
 
-            // =======================================================
-            // 2. 底盤控制
-            // =======================================================
+
             double x = gamepad1.left_stick_x;
             double y = -gamepad1.left_stick_y;
             double rx = gamepad1.right_stick_x;
@@ -194,9 +183,7 @@ public class teleop_v4 extends LinearOpMode {
             frontRightMotor.setPower(frontRightPower);
             backRightMotor.setPower(backRightPower);
 
-            // =======================================================
-            // 3. 射擊馬達 PID 控制 (含緩降)
-            // =======================================================
+
             boolean currentRightBumper = gamepad1.right_bumper;
             if (currentRightBumper && !lastRightBumper) isHighSpeedMode = true;
             lastRightBumper = currentRightBumper;
@@ -242,44 +229,31 @@ public class teleop_v4 extends LinearOpMode {
             double currentPowerFromRight = shooterMotorRight.getPower();
             shooterMotorLeft.setPower(currentPowerFromRight);
 
-            // =======================================================
-            // 4. [新增] 手動回退/解卡球功能 (按 A 鍵)
-            // =======================================================
+
             boolean currentButtonA = gamepad1.a;
             if (currentButtonA && !lastButtonA) {
-                // 只有在還不是第一步(step>0) 且 沒有在發射時 才能回退
                 if (currentFillStep > 0 && fireState == FireState.IDLE) {
-
-                    // 1. 步驟倒退一步
                     currentFillStep--;
-
-                    // 2. 根據退回的步驟，重置Servo位置並清除該洞的記錄
                     if (currentFillStep == 0) {
-                        // 退回到 A 洞
                         diskServo.setPosition(FILL_POS_STEP_1);
                         clearBallStatus("A");
                         LED0.off();
                     } else if (currentFillStep == 1) {
-                        // 退回到 B 洞
                         diskServo.setPosition(FILL_POS_STEP_2);
                         clearBallStatus("B");
                         LED1.off();
                     } else if (currentFillStep == 2) {
-                        // 退回到 C 洞 (原本是FULL狀態)
                         diskServo.setPosition(FILL_POS_STEP_3);
                         clearBallStatus("C");
                         LED2.off();
                     }
-
-                    // 3. 強制讓進球狀態機回到 IDLE，重新開始偵測顏色
                     fillState = FillState.IDLE;
+                    controlGates(true); // 手動回退時也要開閘
                 }
             }
             lastButtonA = currentButtonA;
 
-            // =======================================================
-            // 5. 進球/發射邏輯
-            // =======================================================
+
             if (gamepad1.left_bumper && fireState == FireState.IDLE) {
                 if (hasBallA || hasBallB || hasBallC) {
                     fireState = FireState.PREPARING;
@@ -290,20 +264,18 @@ public class teleop_v4 extends LinearOpMode {
             runFiringLogic();
             runFillingLogic();
 
-            // Intake 控制
             if(gamepad1.y) {
-                intakeMotor.setPower(-1); // 反轉吐球
+                intakeMotor.setPower(-1);
             } else {
                 runIntakeLogic();
             }
 
-            // Telemetry
             if (targetValid) {
                 telemetry.addData("Limelight", "Tx: %.2f | Dist: %.1f", result.getTx(), currentDistance);
             } else {
                 telemetry.addData("Limelight", "SEARCHING...");
             }
-            telemetry.addData("Fill Step", currentFillStep); // 顯示當前在第幾個洞
+            telemetry.addData("Fill Step", currentFillStep);
             telemetry.addData("Shooter Target", "%.0f RPM", desiredTargetRpm);
             telemetry.addData("Commanded RPM", "%.0f RPM", currentCommandedRpm);
             telemetry.addData("Actual Vel", "R: %.0f | L: %.0f", shooterMotorRight.getVelocity(), shooterMotorLeft.getVelocity());
@@ -319,15 +291,77 @@ public class teleop_v4 extends LinearOpMode {
         return heightDiff / Math.tan(angleRad);
     }
 
-    // 邏輯方法
-    private void runFillingLogic() { if (fireState != FireState.IDLE) return; if (currentFillStep >= 3) { fillState = FillState.FULL; return; } else if (fillState == FillState.FULL) { fillState = FillState.IDLE; } switch (fillState) { case IDLE: DetectedColor detectedColor = getDualSensorColor(); if (detectedColor != DetectedColor.UNKNOWN) { recordBallColor(detectedColor); fillTimer = System.currentTimeMillis(); fillState = FillState.WAIT_SETTLE; } break; case WAIT_SETTLE: if (System.currentTimeMillis() - fillTimer > TIME_BALL_SETTLE) { moveToNextFillPosition(); fillTimer = System.currentTimeMillis(); fillState = FillState.ROTATING; } break; case ROTATING: if (System.currentTimeMillis() - fillTimer > TIME_DISK_MOVE_INTAKE) { fillState = FillState.IDLE; } break; case FULL: break; } }
+    private void runFillingLogic() {
+        if (fireState != FireState.IDLE) return;
+
+        if (currentFillStep >= 3) {
+            if (!hasBallA) {
+                currentFillStep = 0;
+                diskServo.setPosition(FILL_POS_STEP_1);
+                controlGates(true);
+                fillState = FillState.IDLE;
+                return;
+            }
+            else if (!hasBallB) {
+                currentFillStep = 1;
+                diskServo.setPosition(FILL_POS_STEP_2);
+                controlGates(true);
+                fillState = FillState.IDLE;
+                return;
+            }
+            else if (!hasBallC) {
+                currentFillStep = 2;
+                diskServo.setPosition(FILL_POS_STEP_3);
+                controlGates(true);
+                fillState = FillState.IDLE;
+                return;
+            }
+
+            fillState = FillState.FULL;
+            controlGates(false);
+            return;
+
+        } else if (fillState == FillState.FULL) {
+            fillState = FillState.IDLE;
+        }
+
+        switch (fillState) {
+            case IDLE:
+                DetectedColor detectedColor = getDualSensorColor();
+                if (detectedColor != DetectedColor.UNKNOWN) {
+                    recordBallColor(detectedColor);
+                    fillTimer = System.currentTimeMillis();
+                    fillState = FillState.WAIT_SETTLE;
+                }
+                break;
+            case WAIT_SETTLE:
+                if (System.currentTimeMillis() - fillTimer > TIME_BALL_SETTLE) {
+                    moveToNextFillPosition();
+                    fillTimer = System.currentTimeMillis();
+                    fillState = FillState.ROTATING;
+                }
+                break;
+            case ROTATING:
+                if (System.currentTimeMillis() - fillTimer > TIME_DISK_MOVE_INTAKE) {
+                    fillState = FillState.IDLE;
+                }
+                break;
+            case FULL:
+                break;
+        }
+    }
+
     private void runFiringLogic() { switch (fireState) { case IDLE: break; case PREPARING: if (System.currentTimeMillis() - fireTimer > TIME_SHOOTER_SPIN) fireState = FireState.DECIDING; break; case DECIDING: if (hasBallC) { targetFirePos = FIRE_POS_HOLE_C; currentTargetHole = "C"; switchToAiming(); LED2.off(); } else if (hasBallB) { targetFirePos = FIRE_POS_HOLE_B; currentTargetHole = "B"; switchToAiming(); LED1.off(); } else if (hasBallA) { targetFirePos = FIRE_POS_HOLE_A; currentTargetHole = "A"; switchToAiming(); LED0.off(); } else { fireTimer = System.currentTimeMillis(); fireState = FireState.RESETTING; diskServo.setPosition(FILL_POS_STEP_1); } break; case AIMING: if (System.currentTimeMillis() - fireTimer > TIME_DISK_MOVE_SHOOTING) { kickerServo.setPosition(KICKER_EXTEND); fireTimer = System.currentTimeMillis(); fireState = FireState.KICKING; } break; case KICKING: if (System.currentTimeMillis() - fireTimer > TIME_KICK_OUT) { kickerServo.setPosition(KICKER_REST); clearBallStatus(currentTargetHole); fireTimer = System.currentTimeMillis(); fireState = FireState.RETRACTING; } break; case RETRACTING: if (System.currentTimeMillis() - fireTimer > TIME_KICK_RETRACT) fireState = FireState.DECIDING; break; case RESETTING: if (System.currentTimeMillis() - fireTimer > 600) { controlGates(true); currentFillStep = 0; fireState = FireState.IDLE; isHighSpeedMode = false; } break; } }
     private void switchToAiming() { diskServo.setPosition(targetFirePos); fireTimer = System.currentTimeMillis(); fireState = FireState.AIMING; }
     private void runIntakeLogic() { if (currentFillStep < 3 && fireState == FireState.IDLE) { intakeMotor.setPower(INTAKE_POWER); } else { intakeMotor.setPower(0.0); } }
     private void recordBallColor(DetectedColor color) { switch (currentFillStep) { case 0: colorHoleA = color.toString(); hasBallA = true; LED0.on(); break; case 1: colorHoleB = color.toString(); hasBallB = true; LED1.on(); break; case 2: colorHoleC = color.toString(); hasBallC = true; LED2.on(); break; } }
-    private void moveToNextFillPosition() { if (currentFillStep == 0) { diskServo.setPosition(FILL_POS_STEP_2); currentFillStep = 1; } else if (currentFillStep == 1) { diskServo.setPosition(FILL_POS_STEP_3); currentFillStep = 2; } else if (currentFillStep == 2) { currentFillStep = 3; } }
 
-    // [修正] 確保清除狀態時完全重置
+    private void moveToNextFillPosition() {
+        if (currentFillStep == 0) { diskServo.setPosition(FILL_POS_STEP_2); currentFillStep = 1; }
+        else if (currentFillStep == 1) { diskServo.setPosition(FILL_POS_STEP_3); currentFillStep = 2; }
+        else if (currentFillStep == 2) { currentFillStep = 3; }
+    }
+
     private void clearBallStatus(String hole) {
         if (hole.equals("A")) { hasBallA = false; colorHoleA = "EMPTY"; }
         if (hole.equals("B")) { hasBallB = false; colorHoleB = "EMPTY"; }

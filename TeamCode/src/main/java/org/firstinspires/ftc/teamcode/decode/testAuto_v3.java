@@ -62,8 +62,8 @@ public class testAuto_v3 extends LinearOpMode {
     public static double TARGET_TX = 3.0;
 
     // === [後場] 修正參數 ===
-    public static double BACK_SHOT_RPM_BOOST = 320.0;
-    public static double BACK_SHOT_TX_OFFSET = 2.5;
+    public static double BACK_SHOT_RPM_BOOST = 280.0;
+    public static double BACK_SHOT_TX_OFFSET = 4;
 
     // === [來自 Teleop] PIDF & 參數 ===
     public static final PIDFCoefficients SHOOTER_PIDF = new PIDFCoefficients(92, 0, 0, 15);
@@ -108,10 +108,10 @@ public class testAuto_v3 extends LinearOpMode {
 
         // 速度限制
         VelConstraint slowVel = new MinVelConstraint(Arrays.asList(
-                new TranslationalVelConstraint(25),
-                new AngularVelConstraint(Math.toRadians(60))
+                new TranslationalVelConstraint(9.6),
+                new AngularVelConstraint(Math.toRadians(90))
         ));
-        AccelConstraint slowAccel = new ProfileAccelConstraint(-25.0, 25.0);
+        AccelConstraint slowAccel = new ProfileAccelConstraint(-9.6, 9.6);
 
         robot.limelight.pipelineSwitch(0);
         robot.limelight.start();
@@ -147,9 +147,9 @@ public class testAuto_v3 extends LinearOpMode {
         // Start: 確保 Angle Servo 歸位
         robot.angleServo.setPosition(ANGLE_CLOSE);
 
-        // [修改] 移除 Servo 4/5 歸位
-        // robot.gateServoL.setPosition(0);
-        // robot.gateServoR.setPosition(0);
+//         [修改] 移除 Servo 4/5 歸位
+        robot.gateServoL.setPosition(0);
+        robot.gateServoR.setPosition(0);
 
         // [修改] 一開始就啟動 Intake 並且不再關閉
         robot.intakeMotor.setPower(1.0);
@@ -176,8 +176,8 @@ public class testAuto_v3 extends LinearOpMode {
 
         // [修改] 讓這個 Action 變成空執行
         Action closeGate = packet -> {
-            // robot.gateServoL.setPosition(0); // 移除
-            // robot.gateServoR.setPosition(0); // 移除
+            robot.gateServoL.setPosition(0); // 移除
+            robot.gateServoR.setPosition(0); // 移除
             return false;
         };
 
@@ -191,26 +191,56 @@ public class testAuto_v3 extends LinearOpMode {
                         new SequentialAction(
                                 drive.actionBuilder(beginPose)
                                         // --- 第一階段：前場射擊 (Front Shot) ---
-//                                        .afterTime(0, cmdTurretBig)
-//                                        .afterTime(0, cmdStartPreheat)
-//                                        .strafeTo(new Vector2d(-80, 0))
-//
-//                                        .stopAndAdd(cmdTurretTrack)
-//                                        .waitSeconds(0.1)
-//                                        .stopAndAdd(new FrontShooterAction(robot, telemetry))
-//                                        .stopAndAdd(cmdStopPreheat)
+                                        .afterTime(0, cmdTurretSmall)
+                                        .afterTime(0, cmdStartPreheat)
 
-                                        // --- 第二階段：吸球 (V8 Style) ---
-//                                        .strafeTo(new Vector2d(-75, -14))
+                                        .stopAndAdd(cmdTurretTrack)
+                                        .waitSeconds(2)
+                                        .stopAndAdd(new BackShooterAction(robot, telemetry))
+                                        .stopAndAdd(cmdStopPreheat)
+
+//                                        // --- 第二階段：吸球 (V8 Style) ---
+//                                        .strafeTo(new Vector2d(-24.5, -14))
 //                                        .afterTime(0, cmdStartPreheat)
 //
 //                                        .afterTime(0, new AutoIntakeAction(robot, telemetry))
 //
 //                                        .afterTime(0, cmdTurretSmall)
-
-                                        .strafeTo(new Vector2d(-0, -25), slowVel, slowAccel)
-
-                                        // 這裡原本會關閉 Intake，現在 cmdStopIntake 是空的，Intake 會繼續轉
+//
+//                                        .strafeTo(new Vector2d(-24.5, -36), slowVel, slowAccel)
+//
+//                                        // 這裡原本會關閉 Intake，現在 cmdStopIntake 是空的，Intake 會繼續轉
+//                                        .stopAndAdd(cmdStopIntake) // 空的
+//                                        .stopAndAdd(cmdTurretSmall)
+//                                        .afterTime(0,cmdTurretTrack)
+//                                        .strafeTo(new Vector2d(0, 0))
+//
+//                                        .stopAndAdd(closeGate) // 空的
+////                                        .waitSeconds(0.5)
+//                                        .stopAndAdd(new BackShooterAction(robot, telemetry))
+//                                        .stopAndAdd(cmdStopPreheat)
+//                                        //-------------------------------------------------------------------------------
+//                                        .strafeTo(new Vector2d(-50, -14))
+//                                        .afterTime(0, cmdStartPreheat)
+//
+//                                        .afterTime(0, new AutoIntakeAction(robot, telemetry))
+//
+//                                        .afterTime(0, cmdTurretSmall)
+//
+//                                        .strafeTo(new Vector2d(-50, -36), slowVel, slowAccel)
+//
+//                                        .stopAndAdd(cmdStopIntake) // 空的
+//                                        .stopAndAdd(cmdTurretSmall)
+//                                        .stopAndAdd(cmdTurretTrack)
+//                                        .strafeTo(new Vector2d(0, 0))
+//
+//                                        .stopAndAdd(closeGate) // 空的
+//                                        .stopAndAdd(new BackShooterAction(robot, telemetry))
+//                                        .stopAndAdd(cmdStopPreheat)
+//
+//                                        //---------------------------------------------------
+//
+//                                        .strafeTo(new Vector2d(-63,-14))
 
 
                                         .build()
@@ -309,21 +339,21 @@ public class testAuto_v3 extends LinearOpMode {
                 }
             }
 
-            double activeTargetTx = testAuto_v3.TARGET_TX;
-            if (testAuto_v3.useBackShootingParams) {
-                activeTargetTx += testAuto_v3.BACK_SHOT_TX_OFFSET;
+            double activeTargetTx = TARGET_TX;
+            if (useBackShootingParams) {
+                activeTargetTx += BACK_SHOT_TX_OFFSET;
             }
 
             switch (currentTurretState) {
                 case MANUAL_POSITION:
                     boolean modeNeedsSetting = (robot.baseMotor.getMode() != DcMotor.RunMode.RUN_TO_POSITION);
-                    boolean posNeedsSetting = (robot.baseMotor.getTargetPosition() != testAuto_v3.targetTurretPos);
+                    boolean posNeedsSetting = (robot.baseMotor.getTargetPosition() != targetTurretPos);
                     if (modeNeedsSetting) {
-                        robot.baseMotor.setTargetPosition(testAuto_v3.targetTurretPos);
+                        robot.baseMotor.setTargetPosition(targetTurretPos);
                         robot.baseMotor.setMode(DcMotor.RunMode.RUN_TO_POSITION);
                         robot.baseMotor.setPower(1.0);
                     } else if (posNeedsSetting) {
-                        robot.baseMotor.setTargetPosition(testAuto_v3.targetTurretPos);
+                        robot.baseMotor.setTargetPosition(targetTurretPos);
                     }
                     break;
                 case AUTO_TRACKING:
@@ -357,8 +387,8 @@ public class testAuto_v3 extends LinearOpMode {
                         desiredRpm = (RPM_SLOPE_FAR * calculatedDistance) + RPM_BASE_FAR;
                     }
 
-                    if (testAuto_v3.useBackShootingParams) {
-                        desiredRpm += testAuto_v3.BACK_SHOT_RPM_BOOST;
+                    if (useBackShootingParams) {
+                        desiredRpm += BACK_SHOT_RPM_BOOST;
                     }
 
                     desiredRpm = Math.max(0, Math.min(2800, desiredRpm));
@@ -399,8 +429,8 @@ public class testAuto_v3 extends LinearOpMode {
         private static final double FILL_POS_1 = 0.0;
         private static final double FILL_POS_2 = 0.3529;
         private static final double FILL_POS_3 = 0.7137;
-        private static final long TIME_BALL_SETTLE = 50;
-        private static final long TIME_DISK_MOVE = 100;
+        private static final long TIME_BALL_SETTLE = 30;
+        private static final long TIME_DISK_MOVE = 60;
         private static final float MIN_DETECT_BRIGHTNESS = 0.7f;
         private static final float PURPLE_RATIO_LIMIT = 1.2f;
 
@@ -413,8 +443,8 @@ public class testAuto_v3 extends LinearOpMode {
         public boolean run(@NonNull TelemetryPacket packet) {
             if (!initialized) {
                 // [修改] 移除 Servo 4/5 設置
-                // robot.gateServoL.setPosition(0.6667);
-                // robot.gateServoR.setPosition(0.6902);
+                robot.gateServoL.setPosition(0.6667);
+                robot.gateServoR.setPosition(0.6902);
 
                 robot.diskServo.setPosition(FILL_POS_1);
                 // 這裡保留 setPower(1.0) 確保如果意外停了還會開，但理論上前面已經開了
@@ -500,7 +530,7 @@ public class testAuto_v3 extends LinearOpMode {
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
             isShootingMode = true;
-            testAuto_v3.useBackShootingParams = false;
+            useBackShootingParams = false;
 
             if (!initialized) {
                 // [修改] 移除 Gate 保護
@@ -575,7 +605,7 @@ public class testAuto_v3 extends LinearOpMode {
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
             isShootingMode = true;
-            testAuto_v3.useBackShootingParams = true;
+            useBackShootingParams = true;
 
             if (!initialized) {
                 // [修改] 移除 Gate 保護
@@ -617,7 +647,7 @@ public class testAuto_v3 extends LinearOpMode {
                     break;
                 case DONE:
                     isShootingMode = false;
-                    testAuto_v3.useBackShootingParams = false;
+                    useBackShootingParams = false;
                     robot.diskServo.setPosition(0.0);
                     return false;
             }

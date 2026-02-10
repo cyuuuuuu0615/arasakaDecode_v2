@@ -37,57 +37,45 @@ import java.util.List;
 import java.util.ArrayList;
 
 @Config
-@Autonomous(name = "AUTO NOW RED") // [修改] 名稱改為 RED
-public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
+@Autonomous(name = "AUTO RED")
+public class testAuto_v5 extends LinearOpMode {
 
-    // === 1. 全域狀態變數 ===
     public enum BallColor { PURPLE, GREEN, UNKNOWN, NONE }
     public static List<BallColor> targetSequence = new ArrayList<>();
     public static BallColor[] actualBallSlots = {BallColor.NONE, BallColor.NONE, BallColor.NONE};
 
-    // === 系統狀態控制 ===
     public static boolean isShootingMode = false;
     public static boolean isPreheating = false;
 
-    // 判斷是否使用後場修正參數
     public static boolean useBackShootingParams = false;
 
-    // 砲塔模式控制
     public enum TurretState { MANUAL_POSITION, AUTO_TRACKING, IDLE }
     public static TurretState currentTurretState = TurretState.MANUAL_POSITION;
 
     public static int targetTurretPos = 0;
 
-    // === [前場] 瞄準參數 ===
-    // [修改] 藍隊是 3.0，紅隊反轉為 -3.0
-    public static double TARGET_TX = -3.0;
 
-    // === [後場] 修正參數 ===
-    public static double BACK_SHOT_RPM_BOOST = 320.0;
-    // [修改] 藍隊是 2.5，紅隊反轉為 -2.5
-    public static double BACK_SHOT_TX_OFFSET = -2.5;
+    public static double TARGET_TX = -6.0;
 
-    // === [來自 Teleop] PIDF & 參數 ===
-    public static final PIDFCoefficients SHOOTER_PIDF = new PIDFCoefficients(92, 0, 0, 15);
+    public static double BACK_SHOT_RPM_BOOST = 30;
+    public static double BACK_SHOT_TX_OFFSET = -0.9;
 
-    // === [來自 Teleop] 幾何參數 ===
+    public static final PIDFCoefficients SHOOTER_PIDF = new PIDFCoefficients(90, 0, 0, 15);
+
     private static final double CAMERA_HEIGHT = 14.5;
     private static final double TARGET_HEIGHT = 39.0;
     private static final double MOUNT_ANGLE = 17.8;
 
-    // === [來自 Teleop] RPM 參數 ===
     private static final double RPM_SLOPE_CLOSE = 11.0;
     private static final double RPM_BASE_CLOSE = 610.0;
-    private static final double RPM_SLOPE_FAR = 10.0;
-    private static final double RPM_BASE_FAR = 620.0;
+    private static final double RPM_SLOPE_FAR = 11.0;
+    private static final double RPM_BASE_FAR = 680.0;
     private static final double RPM_IDLE = 300.0;
 
-    // === [來自 Teleop] Servo 角度 ===
     private static final double ANGLE_CLOSE = 0.0;
     private static final double ANGLE_FAR = 0.12;
     private static final double DISTANCE_THRESHOLD = 35.0;
 
-    // === [實測更新] 砲塔 PID 與修正 ===
     private static final double TURRET_KP = 0.011;
     private static final double TURRET_KD = 0.095;
     private static final double MIN_POWER = 0.06;
@@ -96,7 +84,6 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
 
     @Override
     public void runOpMode() throws InterruptedException {
-        // === 強制重置全域變數 ===
         targetTurretPos = 0;
         isShootingMode = false;
         isPreheating = false;
@@ -108,34 +95,40 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
         Pose2d beginPose = new Pose2d(0, 0, 0);
         MecanumDrive drive = new MecanumDrive(hardwareMap, beginPose);
 
-        // 速度限制
         VelConstraint slowVel = new MinVelConstraint(Arrays.asList(
-                new TranslationalVelConstraint(10),
+                new TranslationalVelConstraint(9),
                 new AngularVelConstraint(Math.toRadians(90))
         ));
-        AccelConstraint slowAccel = new ProfileAccelConstraint(-10, 10);
+        AccelConstraint slowAccel = new ProfileAccelConstraint(-9, 9);
 
         robot.limelight.pipelineSwitch(0);
         robot.limelight.start();
 
-        // 預設順序
         targetSequence.clear();
         targetSequence.add(BallColor.PURPLE);
         targetSequence.add(BallColor.PURPLE);
         targetSequence.add(BallColor.PURPLE);
 
-        telemetry.addLine("Ready: AUTO NOW RED (Inverse Coords)");
+        telemetry.addLine("Ready: AUTO RED (Target 24) - Coordinates Mirrored");
         telemetry.update();
 
-        // Init Loop
         while (opModeInInit()) {
             LLResult result = robot.limelight.getLatestResult();
             int id = -1;
             if (result != null && result.isValid()) {
                 List<LLResultTypes.FiducialResult> tags = result.getFiducialResults();
-                if (!tags.isEmpty()) id = (int) tags.get(0).getFiducialId();
+                // 這裡保留偵測 21,22,23 的邏輯
+                if (!tags.isEmpty()) {
+                    for (LLResultTypes.FiducialResult tag : tags) {
+                        int tempId = (int) tag.getFiducialId();
+                        if (tempId >= 21 && tempId <= 23) {
+                            id = tempId;
+                            break;
+                        }
+                    }
+                }
             }
-            // TODO: 確認紅隊是否使用相同的 ID (21, 22, 23)。如果不一樣，請在此處修改。
+
             if (id == 21) setSequence(BallColor.GREEN, BallColor.PURPLE, BallColor.PURPLE);
             else if (id == 22) setSequence(BallColor.PURPLE, BallColor.GREEN, BallColor.PURPLE);
             else if (id == 23) setSequence(BallColor.PURPLE, BallColor.PURPLE, BallColor.GREEN);
@@ -147,100 +140,82 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
         waitForStart();
         if (isStopRequested()) return;
 
-        // Start: 確保 Angle Servo 歸位
         robot.angleServo.setPosition(ANGLE_CLOSE);
-
-        // [修改] 一開始就啟動 Intake 並且不再關閉
+        robot.gateServoL.setPosition(0);
+        robot.gateServoR.setPosition(0);
         robot.intakeMotor.setPower(1.0);
 
-        // 設定初始持球狀態
         actualBallSlots[0] = BallColor.PURPLE;
         actualBallSlots[1] = BallColor.PURPLE;
         actualBallSlots[2] = BallColor.GREEN;
 
-        // === Action 定義 ===
+
         Action cmdTurretBig = packet -> { currentTurretState = TurretState.MANUAL_POSITION; targetTurretPos = 370; return false; };
-        Action cmdTurretSmall = packet -> { currentTurretState = TurretState.MANUAL_POSITION; targetTurretPos = -35; return false; };
+        Action cmdTurretSmall = packet -> { currentTurretState = TurretState.MANUAL_POSITION; targetTurretPos = -43; return false; };
+
         Action cmdTurretTrack = packet -> { currentTurretState = TurretState.AUTO_TRACKING; return false; };
         Action cmdStartPreheat = packet -> { isPreheating = true; return false; };
         Action cmdStopPreheat  = packet -> { isPreheating = false; return false; };
 
-        // [修改] 讓這個 Action 變成空執行，不關閉 Intake
         Action cmdStopIntake = packet -> { return false; };
+        Action closeGate = packet -> {
+            robot.gateServoL.setPosition(0);
+            robot.gateServoR.setPosition(0);
+            return false;
+        };
 
-        // [修改] 讓這個 Action 變成空執行
-        Action closeGate = packet -> { return false; };
-
-        // === 路徑執行 (所有 Vector2d X, Y 取反) ===
         Actions.runBlocking(
                 new ParallelAction(
-                        // 1. 後台系統 (砲塔瞄準 + 飛輪控速)
                         new BackgroundSystemAction(robot, telemetry),
 
-                        // 2. 主流程
                         new SequentialAction(
                                 drive.actionBuilder(beginPose)
-                                        // --- 第一階段：前場射擊 (Front Shot) ---
-                                        .afterTime(0, cmdTurretBig)
+                                        .afterTime(0, cmdTurretSmall) // 43
                                         .afterTime(0, cmdStartPreheat)
-                                        // Blue: (-80, 0) -> Red: (80, 0)
-                                        .strafeTo(new Vector2d(80, 0))
 
                                         .stopAndAdd(cmdTurretTrack)
-                                        .waitSeconds(0.1)
-                                        .stopAndAdd(new FrontShooterAction(robot, telemetry))
+                                        .waitSeconds(2)
+                                        .stopAndAdd(new BackShooterAction(robot, telemetry))
                                         .stopAndAdd(cmdStopPreheat)
 
-                                        // --- 第二階段：吸球 (V8 Style) ---
-                                        // Blue: (-75, -14) -> Red: (75, 14)
-                                        .strafeTo(new Vector2d(75, 14))
+                                        .strafeTo(new Vector2d(24.5, 14))
                                         .afterTime(0, cmdStartPreheat)
+                                        .afterTime(0, new AutoIntakeAction(robot, telemetry))
 
+                                        .afterTime(0, cmdTurretSmall) // 43
+
+                                        .strafeTo(new Vector2d(24.5, 36), slowVel, slowAccel)
+
+                                        .stopAndAdd(cmdTurretSmall)
+                                        .afterTime(0, cmdTurretTrack)
+                                        .strafeTo(new Vector2d(0, 0)) // 回到原點
+
+                                        .stopAndAdd(closeGate)
+                                        .waitSeconds(0.5)
+                                        .stopAndAdd(new BackShooterAction(robot, telemetry))
+                                        .stopAndAdd(closeGate)
+                                        .stopAndAdd(cmdStopPreheat)
+
+                                        .strafeTo(new Vector2d(50, 14))
+                                        .afterTime(0, cmdStartPreheat)
                                         .afterTime(0, new AutoIntakeAction(robot, telemetry))
 
                                         .afterTime(0, cmdTurretSmall)
 
-                                        // Blue: (-76, -36) -> Red: (76, 36)
-                                        .strafeTo(new Vector2d(76, 36), slowVel, slowAccel)
+                                        .strafeTo(new Vector2d(50, 36), slowVel, slowAccel)
 
                                         .stopAndAdd(cmdStopIntake)
-                                        .stopAndAdd(cmdTurretTrack)
-                                        // Blue: (-76, 0) -> Red: (76, 0)
-                                        .strafeTo(new Vector2d(76,0))
-
-                                        // --- 第三階段：後場射擊 (Back Shot) ---
-                                        .strafeTo(new Vector2d(0, 0))
-
-                                        .waitSeconds(0.6)
-                                        .stopAndAdd(closeGate)
-                                        .stopAndAdd(new BackShooterAction(robot, telemetry))
-                                        .stopAndAdd(cmdStopPreheat)
-                                        //-------------------------------------------------------------------------------
-                                        // Blue: (-24, -14) -> Red: (24, 14)
-                                        .strafeTo(new Vector2d(24, 14))
-                                        .afterTime(0, cmdStartPreheat)
-
-                                        .afterTime(0, new AutoIntakeAction(robot, telemetry))
-
-                                        .afterTime(0, cmdTurretSmall)
-
-                                        // Blue: (-24, -36) -> Red: (24, 36)
-                                        .strafeTo(new Vector2d(24, 36), slowVel, slowAccel)
-
-                                        .stopAndAdd(cmdStopIntake) // 空的
                                         .stopAndAdd(cmdTurretSmall)
                                         .stopAndAdd(cmdTurretTrack)
+
                                         .strafeTo(new Vector2d(0, 0))
 
-                                        .stopAndAdd(closeGate) // 空的
+                                        .stopAndAdd(closeGate)
                                         .stopAndAdd(new BackShooterAction(robot, telemetry))
+                                        .stopAndAdd(closeGate)
                                         .stopAndAdd(cmdStopPreheat)
 
-                                        //---------------------------------------------------
-
-                                        // Blue: (-63, -12) -> Red: (63, 12)
-                                        .strafeTo(new Vector2d(63, 12))
-
+                                        .strafeTo(new Vector2d(63, 36))
 
                                         .build()
                         )
@@ -250,12 +225,12 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
 
     private void setSequence(BallColor c1, BallColor c2, BallColor c3) {
         targetSequence.clear();
-        targetSequence.add(c1); targetSequence.add(c2); targetSequence.add(c3);
+        targetSequence.add(c1);
+        targetSequence.add(c2);
+        targetSequence.add(c3);
     }
 
-    // =========================================================
-    // Shared Hardware Class (不變)
-    // =========================================================
+
     public static class SharedHardware {
         public Limelight3A limelight;
         public DcMotorEx shooterRight, shooterLeft;
@@ -303,9 +278,7 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
         }
     }
 
-    // =========================================================
-    // BackgroundSystemAction
-    // =========================================================
+
     public static class BackgroundSystemAction implements Action {
         private final SharedHardware robot;
         private final Telemetry telemetry;
@@ -314,8 +287,7 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
         private double lastValidTargetRpm = RPM_IDLE;
         private static final double RPM_RAMP_DOWN_STEP = 0.4;
 
-        // [重要] 請確認紅隊使用的 Tag ID。藍隊是 20，紅隊通常不同。
-        // 如果您不確定，請檢查 Teleop 或場地說明。
+        // [重要修正] 紅隊目標 ID 設定為 24
         private static final int TARGET_TAG_ID = 24;
 
         public BackgroundSystemAction(SharedHardware robot, Telemetry telemetry) {
@@ -333,8 +305,8 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
                 for (LLResultTypes.FiducialResult tag : tags) {
                     if (tag.getFiducialId() == TARGET_TAG_ID) {
                         validTarget = true;
-                        tx = result.getTx();
-                        ty = result.getTy();
+                        tx = tag.getTargetXDegrees();
+                        ty = tag.getTargetYDegrees();
                         break;
                     }
                 }
@@ -359,7 +331,9 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
                     break;
                 case AUTO_TRACKING:
                     if (robot.baseMotor.getMode() == DcMotor.RunMode.RUN_TO_POSITION) robot.baseMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+
                     if (validTarget) {
+                        // PID 邏輯維持不變，因為 Target Pos 變了，誤差方向會自動修正
                         double error = tx - activeTargetTx;
                         double dTerm = (error - lastError) * TURRET_KD;
                         double power = (error * TURRET_KP) + dTerm;
@@ -369,17 +343,21 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
                             robot.baseMotor.setPower(power);
                         } else robot.baseMotor.setPower(0);
                         lastError = error;
-                    } else robot.baseMotor.setPower(0);
+                    } else {
+                        robot.baseMotor.setPower(0);
+                    }
                     break;
                 case IDLE: robot.baseMotor.setPower(0); break;
             }
 
             double desiredRpm;
             double calculatedDistance = -1;
+
             if (isShootingMode || isPreheating) {
                 if (validTarget) {
                     double angleRad = Math.toRadians(MOUNT_ANGLE + ty);
                     calculatedDistance = (TARGET_HEIGHT - CAMERA_HEIGHT) / Math.tan(angleRad);
+
                     if (calculatedDistance <= DISTANCE_THRESHOLD) {
                         robot.angleServo.setPosition(ANGLE_CLOSE);
                         desiredRpm = (RPM_SLOPE_CLOSE * calculatedDistance) + RPM_BASE_CLOSE;
@@ -416,9 +394,7 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
         }
     }
 
-    // =========================================================
-    // AutoIntakeAction
-    // =========================================================
+
     public static class AutoIntakeAction implements Action {
         private final SharedHardware robot;
         private final Telemetry telemetry;
@@ -430,8 +406,8 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
         private static final double FILL_POS_1 = 0.0;
         private static final double FILL_POS_2 = 0.3529;
         private static final double FILL_POS_3 = 0.7137;
-        private static final long TIME_BALL_SETTLE = 50;
-        private static final long TIME_DISK_MOVE = 100;
+        private static final long TIME_BALL_SETTLE = 30;
+        private static final long TIME_DISK_MOVE = 60;
         private static final float MIN_DETECT_BRIGHTNESS = 0.7f;
         private static final float PURPLE_RATIO_LIMIT = 1.2f;
 
@@ -443,6 +419,8 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
         @Override
         public boolean run(@NonNull TelemetryPacket packet) {
             if (!initialized) {
+                robot.gateServoL.setPosition(0.6667);
+                robot.gateServoR.setPosition(0.6902);
                 robot.diskServo.setPosition(FILL_POS_1);
                 robot.intakeMotor.setPower(1.0);
                 Arrays.fill(actualBallSlots, BallColor.NONE);
@@ -500,78 +478,6 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
         }
     }
 
-    // =========================================================
-    // Action 1: FrontShooterAction
-    // =========================================================
-    public static class FrontShooterAction implements Action {
-        private final SharedHardware robot;
-        private final Telemetry telemetry;
-        private boolean initialized = false;
-        private long timer = 0;
-        private int shotsFired = 0;
-        private int sequenceIndex = 0;
-        private String currentSlot = "";
-        private static final double FIRE_POS_A = 0.8196;
-        private static final double FIRE_POS_B = 0.0471;
-        private static final double FIRE_POS_C = 0.4314;
-        private enum State { INIT, CHECK_RPM, AIM_DISK, KICK, RETRACT, DONE }
-        private State state = State.INIT;
-
-        public FrontShooterAction(SharedHardware robot, Telemetry telemetry) { this.robot = robot; this.telemetry = telemetry; }
-
-        @Override
-        public boolean run(@NonNull TelemetryPacket packet) {
-            isShootingMode = true;
-            useBackShootingParams = false;
-
-            if (!initialized) {
-                shotsFired = 0;
-                sequenceIndex = 0;
-                state = State.INIT;
-                initialized = true;
-            }
-            switch (state) {
-                case INIT:
-                    if (shotsFired >= 3 || sequenceIndex >= targetSequence.size()) state = State.DONE;
-                    else { state = State.CHECK_RPM; timer = System.currentTimeMillis(); }
-                    break;
-                case CHECK_RPM:
-                    if (System.currentTimeMillis() - timer > 100) {
-                        state = State.AIM_DISK;
-                        BallColor needed = targetSequence.get(sequenceIndex);
-                        String slot = findSlotForColor(needed);
-                        if (slot == null) slot = findAnyOccupiedSlot();
-                        if (slot == null) { state = State.DONE; break; }
-                        currentSlot = slot; setupDisk(slot); timer = System.currentTimeMillis();
-                    }
-                    break;
-                case AIM_DISK:
-                    if (System.currentTimeMillis() - timer > 550) {
-                        robot.kickerServo.setPosition(0.8);
-                        timer = System.currentTimeMillis();
-                        state = State.KICK;
-                    }
-                    break;
-                case KICK:
-                    if (System.currentTimeMillis() - timer > 300) { robot.kickerServo.setPosition(0.0); removeBall(currentSlot); shotsFired++; sequenceIndex++; state = State.RETRACT; timer = System.currentTimeMillis(); }
-                    break;
-                case RETRACT:
-                    if (System.currentTimeMillis() - timer > 200) state = State.INIT;
-                    break;
-                case DONE:
-                    isShootingMode = false; robot.diskServo.setPosition(0.0); return false;
-            }
-            return true;
-        }
-        private void setupDisk(String slot) { if (slot.equals("A")) robot.diskServo.setPosition(FIRE_POS_A); else if (slot.equals("B")) robot.diskServo.setPosition(FIRE_POS_B); else robot.diskServo.setPosition(FIRE_POS_C); }
-        private String findSlotForColor(BallColor color) { if (actualBallSlots[0] == color) return "A"; if (actualBallSlots[1] == color) return "B"; if (actualBallSlots[2] == color) return "C"; return null; }
-        private String findAnyOccupiedSlot() { if (actualBallSlots[2] != BallColor.NONE) return "C"; if (actualBallSlots[1] != BallColor.NONE) return "B"; if (actualBallSlots[0] != BallColor.NONE) return "A"; return null; }
-        private void removeBall(String slot) { if (slot.equals("A")) actualBallSlots[0] = BallColor.NONE; else if (slot.equals("B")) actualBallSlots[1] = BallColor.NONE; else actualBallSlots[2] = BallColor.NONE; }
-    }
-
-    // =========================================================
-    // Action 2: BackShooterAction
-    // =========================================================
     public static class BackShooterAction implements Action {
         private final SharedHardware robot;
         private final Telemetry telemetry;
@@ -580,7 +486,6 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
         private int shotsFired = 0;
         private int sequenceIndex = 0;
         private String currentSlot = "";
-
         private static final int WAIT_AIM_TIME = 600;
         private static final double FIRE_POS_A = 0.8196;
         private static final double FIRE_POS_B = 0.0471;
@@ -596,10 +501,7 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
             useBackShootingParams = true;
 
             if (!initialized) {
-                shotsFired = 0;
-                sequenceIndex = 0;
-                state = State.INIT;
-                initialized = true;
+                shotsFired = 0; sequenceIndex = 0; state = State.INIT; initialized = true;
             }
             switch (state) {
                 case INIT:
@@ -630,10 +532,7 @@ public class testAuto_v5 extends LinearOpMode { // [修改] Class 名稱
                     if (System.currentTimeMillis() - timer > 200) state = State.INIT;
                     break;
                 case DONE:
-                    isShootingMode = false;
-                    useBackShootingParams = false;
-                    robot.diskServo.setPosition(0.0);
-                    return false;
+                    isShootingMode = false; useBackShootingParams = false; robot.diskServo.setPosition(0.0); return false;
             }
             return true;
         }
