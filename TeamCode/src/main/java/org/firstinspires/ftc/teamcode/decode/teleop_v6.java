@@ -55,13 +55,13 @@ public class teleop_v6 extends LinearOpMode {
     // === 參數設定 ===
     // 裝球位置 (Filling)
     private static final double FILL_POS_STEP_1 = 0.0;     // Hole A
-    private static final double FILL_POS_STEP_2 = 0.3529;  // Hole B
-    private static final double FILL_POS_STEP_3 = 0.7137;  // Hole C
+    private static final double FILL_POS_STEP_2 = 0.3529/1.4;  // Hole B SCY MOD
+    private static final double FILL_POS_STEP_3 = 0.7137/1.4;  // Hole C SCY MOD
 
     // 發射位置 (Firing)
-    private static final double FIRE_POS_HOLE_B = 0.0471;
-    private static final double FIRE_POS_HOLE_C = 0.4314;
-    private static final double FIRE_POS_HOLE_A = 0.8196;
+    private static final double FIRE_POS_HOLE_B = 0.0471/1.4; //SCY MOD
+    private static final double FIRE_POS_HOLE_C = 0.4314/1.4; //SCY MOD
+    private static final double FIRE_POS_HOLE_A = 0.8196/1.4; //SCY MOD
 
     // Kicker
     private static final double KICKER_REST = 0.0;
@@ -69,14 +69,14 @@ public class teleop_v6 extends LinearOpMode {
 
     // 時間參數 (ms)
     private static final int TIME_BALL_SETTLE = 150;
-    private static final int TIME_DISK_MOVE_INTAKE = 350;
-    private static final int TIME_DISK_MOVE_SHOOTING = 500;
+    private static final int TIME_DISK_MOVE_INTAKE =300; //SCY mod
+    private static final int TIME_DISK_MOVE_SHOOTING = 400; //SCY mod;
     private static final int TIME_SHOOTER_SPIN = 1000;
     private static final int TIME_KICK_OUT = 300;
     private static final int TIME_KICK_RETRACT = 250;
 
     // 閘門
-    private static final double GATE_CLOSED = 0.0;
+    private static final double GATE_CLOSED = 0.32; //SCY MOD
     private static final double GATE_L_OPEN = 0.6667;
     private static final double GATE_R_OPEN = 0.6902;
 
@@ -86,7 +86,7 @@ public class teleop_v6 extends LinearOpMode {
     private static final float PURPLE_RATIO_LIMIT = 1.2f;
 
     // Intake Power
-    private static final double INTAKE_POWER = 0.6;
+    private static final double INTAKE_POWER = 1.0;
 
     // === 狀態機定義 ===
     private enum FillState { IDLE, WAIT_SETTLE, ROTATING, FULL }
@@ -116,6 +116,7 @@ public class teleop_v6 extends LinearOpMode {
 
         Servo angleServo = hardwareMap.get(Servo.class,"servo3");
         angleServo.setDirection(Servo.Direction.REVERSE);
+
 
         // 啟動 Limelight
         limelight.pipelineSwitch(0);
@@ -251,6 +252,7 @@ public class teleop_v6 extends LinearOpMode {
                 }
             }
 
+
             // === 執行邏輯 ===
             runFiringLogic();
             runFillingLogic();
@@ -374,7 +376,7 @@ public class teleop_v6 extends LinearOpMode {
         if (currentFillStep < 3 && fireState == FireState.IDLE) {
             intakeMotor.setPower(INTAKE_POWER);
         } else {
-            intakeMotor.setPower(0.0);
+            //intakeMotor.setPower(0.0); //SCY MOD
         }
     }
 
@@ -467,7 +469,7 @@ public class teleop_v6 extends LinearOpMode {
         frontLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         kickerServo.scaleRange(0.0, 0.5);
-        gateServoL.setDirection(Servo.Direction.REVERSE);
+        gateServoL.setDirection(Servo.Direction.FORWARD);//SCY MOD
         gateServoR.setDirection(Servo.Direction.FORWARD);
         shooterMotorLeft.setDirection(DcMotorSimple.Direction.REVERSE);
         intakeMotor.setDirection(DcMotorSimple.Direction.REVERSE);

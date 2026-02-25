@@ -154,6 +154,9 @@ public class teleop_v4 extends LinearOpMode {
                 lastError = 0;
             }
 
+            telemetry.addData("motor6 position",baseMotor.getCurrentPosition());
+            telemetry.addData("shooter velocity",shooterMotorRight.getVelocity());
+
 
             double x = gamepad1.left_stick_x;
             double y = -gamepad1.left_stick_y;

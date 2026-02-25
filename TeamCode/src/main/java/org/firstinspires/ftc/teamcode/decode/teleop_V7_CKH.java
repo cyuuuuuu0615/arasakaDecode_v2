@@ -13,8 +13,8 @@ import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
 
-@TeleOp(name = "A BULE Teleop")
-public class teleop_v3 extends LinearOpMode {
+@TeleOp(name = "A BULE Teleop_CKH")
+public class teleop_V7_CKH extends LinearOpMode {
 
     private Limelight3A limelight;
     private final double TARGET_TX = 6.0;
@@ -25,7 +25,6 @@ public class teleop_v3 extends LinearOpMode {
     private final double MAX_POWER = 0.40;
     private final double DEADBAND = 1.5;
 
-
     private static final double CAMERA_HEIGHT = 14.5;
     private static final double TARGET_HEIGHT = 39.0;
     private static final double MOUNT_ANGLE = 17.8;
@@ -34,9 +33,9 @@ public class teleop_v3 extends LinearOpMode {
     private static final double ANGLE_FAR = 0.12;
 
     private static final double RPM_SLOPE_CLOSE = 11.0;
-    private static final double RPM_BASE_CLOSE = 610.0;
+    private static final double RPM_BASE_CLOSE = 540.0;
     private static final double RPM_SLOPE_FAR = 11.0;
-    private static final double RPM_BASE_FAR = 680.0;
+    private static final double RPM_BASE_FAR = 640.0;
     private static final double RPM_IDLE = 300.0;
 
     private double currentCommandedRpm = RPM_IDLE;
@@ -67,9 +66,9 @@ public class teleop_v3 extends LinearOpMode {
     private static final int TIME_BALL_SETTLE = 170;
     private static final int TIME_DISK_MOVE_INTAKE =300; //SCY mod
     private static final int TIME_DISK_MOVE_SHOOTING = 400; //SCY mod;
-    private static final int TIME_SHOOTER_SPIN = 1000;
-    private static final int TIME_KICK_OUT = 300;
-    private static final int TIME_KICK_RETRACT = 250;
+    private static final int TIME_SHOOTER_SPIN = 500;
+    private static final int TIME_KICK_OUT = 250;
+    private static final int TIME_KICK_RETRACT = 150;
 
     private static final double GATE_CLOSED = 0.32;//SCY MOD
     private static final double GATE_L_OPEN = 0.6667;
@@ -156,7 +155,6 @@ public class teleop_v3 extends LinearOpMode {
             telemetry.addData("shooter velocity",shooterMotorRight.getVelocity());
 
 
-
             double x = gamepad1.left_stick_x;
             double y = -gamepad1.left_stick_y;
             double rx = gamepad1.right_stick_x;
@@ -215,8 +213,15 @@ public class teleop_v3 extends LinearOpMode {
                 if(gamepad1.dpad_down) angleServo.setPosition(ANGLE_CLOSE);
             }
 
-            if (isHighSpeedMode) desiredTargetRpm = calculatedRpm;
-            else desiredTargetRpm = RPM_IDLE;
+            // ==========================================
+            // 優化 1：提前加速 (Pre-spooling)
+            // ==========================================
+            boolean hasAnyBall = hasBallA || hasBallB || hasBallC;
+            if (isHighSpeedMode || (targetValid && hasAnyBall)) {
+                desiredTargetRpm = calculatedRpm;
+            } else {
+                desiredTargetRpm = RPM_IDLE;
+            }
 
             if (desiredTargetRpm >= currentCommandedRpm) {
                 currentCommandedRpm = desiredTargetRpm;
@@ -353,7 +358,54 @@ public class teleop_v3 extends LinearOpMode {
         }
     }
 
-    private void runFiringLogic() { switch (fireState) { case IDLE: break; case PREPARING: if (System.currentTimeMillis() - fireTimer > TIME_SHOOTER_SPIN) fireState = FireState.DECIDING; break; case DECIDING: if (hasBallC) { targetFirePos = FIRE_POS_HOLE_C; currentTargetHole = "C"; switchToAiming(); LED2.off(); } else if (hasBallB) { targetFirePos = FIRE_POS_HOLE_B; currentTargetHole = "B"; switchToAiming(); LED1.off(); } else if (hasBallA) { targetFirePos = FIRE_POS_HOLE_A; currentTargetHole = "A"; switchToAiming(); LED0.off(); } else { fireTimer = System.currentTimeMillis(); fireState = FireState.RESETTING; diskServo.setPosition(FILL_POS_STEP_1); } break; case AIMING: if (System.currentTimeMillis() - fireTimer > TIME_DISK_MOVE_SHOOTING) { kickerServo.setPosition(KICKER_EXTEND); fireTimer = System.currentTimeMillis(); fireState = FireState.KICKING; } break; case KICKING: if (System.currentTimeMillis() - fireTimer > TIME_KICK_OUT) { kickerServo.setPosition(KICKER_REST); clearBallStatus(currentTargetHole); fireTimer = System.currentTimeMillis(); fireState = FireState.RETRACTING; } break; case RETRACTING: if (System.currentTimeMillis() - fireTimer > TIME_KICK_RETRACT) fireState = FireState.DECIDING; break; case RESETTING: if (System.currentTimeMillis() - fireTimer > 600) { controlGates(true); currentFillStep = 0; fireState = FireState.IDLE; isHighSpeedMode = false; } break; } }
+    // ==========================================
+    // 優化 2：排版整理並加入動態轉速偵測
+    // ==========================================
+    private void runFiringLogic() {
+        switch (fireState) {
+            case IDLE:
+                break;
+            case PREPARING:
+                double currentRpm = shooterMotorRight.getVelocity();
+                // 如果誤差小於 100 RPM，或是等待超過 800ms(保底)，就立刻開火
+                if (Math.abs(currentRpm - desiredTargetRpm) < 100 || System.currentTimeMillis() - fireTimer > 800) {
+                    fireState = FireState.DECIDING;
+                }
+                break;
+            case DECIDING:
+                if (hasBallC) {
+                    targetFirePos = FIRE_POS_HOLE_C; currentTargetHole = "C"; switchToAiming(); LED2.off();
+                } else if (hasBallB) {
+                    targetFirePos = FIRE_POS_HOLE_B; currentTargetHole = "B"; switchToAiming(); LED1.off();
+                } else if (hasBallA) {
+                    targetFirePos = FIRE_POS_HOLE_A; currentTargetHole = "A"; switchToAiming(); LED0.off();
+                } else {
+                    fireTimer = System.currentTimeMillis(); fireState = FireState.RESETTING; diskServo.setPosition(FILL_POS_STEP_1);
+                }
+                break;
+            case AIMING:
+                if (System.currentTimeMillis() - fireTimer > TIME_DISK_MOVE_SHOOTING) {
+                    kickerServo.setPosition(KICKER_EXTEND); fireTimer = System.currentTimeMillis(); fireState = FireState.KICKING;
+                }
+                break;
+            case KICKING:
+                if (System.currentTimeMillis() - fireTimer > TIME_KICK_OUT) {
+                    kickerServo.setPosition(KICKER_REST); clearBallStatus(currentTargetHole); fireTimer = System.currentTimeMillis(); fireState = FireState.RETRACTING;
+                }
+                break;
+            case RETRACTING:
+                if (System.currentTimeMillis() - fireTimer > TIME_KICK_RETRACT) {
+                    fireState = FireState.DECIDING;
+                }
+                break;
+            case RESETTING:
+                if (System.currentTimeMillis() - fireTimer > 600) {
+                    controlGates(true); currentFillStep = 0; fireState = FireState.IDLE; isHighSpeedMode = false;
+                }
+                break;
+        }
+    }
+
     private void switchToAiming() { diskServo.setPosition(targetFirePos); fireTimer = System.currentTimeMillis(); fireState = FireState.AIMING; }
     private void runIntakeLogic() { if (currentFillStep < 3 && fireState == FireState.IDLE) { intakeMotor.setPower(INTAKE_POWER); } else {
         //intakeMotor.setPower(0.0); //SCY MOD

@@ -37,7 +37,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 @Config
-@Autonomous(name = "AUTO RED")
+@Autonomous(name = "testAuto_v5")
 public class testAuto_v5 extends LinearOpMode {
 
     public enum BallColor { PURPLE, GREEN, UNKNOWN, NONE }
